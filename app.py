@@ -1,37 +1,61 @@
 import os
+import sys
 import json
 import base64
 from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, send_file, jsonify
 from docx import Document
-from openai import OpenAI
 
+# Initialize Flask app
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # ---------------------------
 # DEEPSEEK API CONFIGURATION
 # ---------------------------
+try:
+    from openai import OpenAI
+except ImportError as e:
+    print(f"Error importing OpenAI: {e}")
+    sys.exit(1)
+
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
     print("⚠️ DEEPSEEK_API_KEY not set. Please set it in environment variables.")
+    # For demo purposes only - exit in production
+    sys.exit(1)
 
-# Initialize DeepSeek client (uses OpenAI-compatible API)
-client = OpenAI(
-    api_key=DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com/v1"  # DeepSeek's endpoint
-)
+# Initialize DeepSeek client
+try:
+    client = OpenAI(
+        api_key=DEEPSEEK_API_KEY,
+        base_url="https://api.deepseek.com/v1"
+    )
+    print("✅ DeepSeek client initialized successfully")
+except Exception as e:
+    print(f"❌ Failed to initialize DeepSeek client: {e}")
+    sys.exit(1)
 
 # File paths
 CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
+# Check if files exist
+print(f"📂 Checking for CV file: {CV_PATH}")
+if not os.path.exists(CV_PATH):
+    print(f"❌ CV file not found: {CV_PATH}")
+    print(f"📂 Directory contents: {os.listdir('.')}")
+
+print(f"📂 Checking for Cover file: {COVER_PATH}")
+if not os.path.exists(COVER_PATH):
+    print(f"❌ Cover file not found: {COVER_PATH}")
+
 def call_deepseek(prompt):
     """Call DeepSeek API with proper format"""
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",  # DeepSeek's model name
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": "You are an expert CV tailoring assistant."},
                 {"role": "user", "content": prompt}
@@ -197,7 +221,10 @@ def process_application(job_description):
 @app.route('/')
 def index():
     """Main dashboard page"""
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        return f"Error loading template: {str(e)}", 500
 
 @app.route('/tailor', methods=['POST'])
 def tailor():
@@ -230,8 +257,17 @@ def tailor():
             return jsonify({'error': message}), 500
             
     except Exception as e:
+        print(f"Error in /tailor: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health():
+    """Health check endpoint for Railway"""
+    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
+    print(f"🚀 Starting Flask app on port {port}")
+    print(f"📂 Current directory: {os.getcwd()}")
+    print(f"📂 Files: {os.listdir('.')}")
     app.run(host='0.0.0.0', port=port, debug=False)
