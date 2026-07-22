@@ -5,24 +5,78 @@ from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, send_file, jsonify
 from docx import Document
-from openai import OpenAI
 import tempfile
+
+# Fix: Handle OpenAI import with version compatibility
+try:
+    from openai import OpenAI
+except ImportError:
+    import openai as _openai
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
-# Initialize OpenAI
+# Fix: Initialize OpenAI with proper error handling
 API_KEY = os.environ.get("OPENAI_API_KEY")
 if not API_KEY:
     print("⚠️ OPENAI_API_KEY not set. Please set it in environment variables.")
     # For development only - remove in production
     API_KEY = "your-api-key-here"
 
-client = OpenAI(api_key=API_KEY)
+# Fix: Try different initialization methods
+client = None
+try:
+    # Method 1: New OpenAI client (v1.0+)
+    from openai import OpenAI
+    client = OpenAI(api_key=API_KEY)
+    print("✅ OpenAI client initialized (v1.0+)")
+except (TypeError, ImportError) as e:
+    print(f"⚠️ OpenAI v1.0+ failed: {e}")
+    try:
+        # Method 2: Old OpenAI client (v0.x)
+        import openai
+        openai.api_key = API_KEY
+        client = openai
+        print("✅ OpenAI client initialized (v0.x)")
+    except Exception as e2:
+        print(f"❌ OpenAI initialization failed: {e2}")
+        client = None
 
 # File paths (these will be in the deployment)
 CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
+
+def call_openai(prompt):
+    """Unified OpenAI call for both versions"""
+    if not client:
+        raise Exception("OpenAI client not initialized")
+    
+    try:
+        # Try new version
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are an expert CV tailoring assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            response_format={"type": "json_object"},
+            temperature=0.3
+        )
+        return json.loads(response.choices[0].message.content)
+    except AttributeError:
+        # Fallback to old version
+        response = client.ChatCompletion.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are an expert CV tailoring assistant."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3
+        )
+        return json.loads(response.choices[0].message.content)
+    except Exception as e:
+        print(f"OpenAI error: {str(e)}")
+        raise e
 
 def read_docx(file_path):
     """Extract text from .docx file"""
@@ -101,56 +155,7 @@ Return JSON:
 }}
 """
     
-    try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are an expert CV tailoring assistant."},
-                {"role": "user", "content": prompt}
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.3
-        )
-        
-        result = json.loads(response.choices[0].message.content)
-        return result
-    except Exception as e:
-        print(f"OpenAI error: {str(e)}")
-        return None
-
-def generate_tailored_docx(template_path, new_text, section_to_replace=None):
-    """Generate tailored DOCX preserving formatting"""
-    doc = Document(template_path)
-    
-    if section_to_replace:
-        # Replace only specific section
-        for paragraph in doc.paragraphs:
-            text_lower = paragraph.text.lower()
-            if any(keyword in text_lower for keyword in ['summary', 'profile']):
-                if paragraph.runs:
-                    paragraph.runs[0].text = new_text
-            elif any(keyword in text_lower for keyword in ['skill', 'core', 'competencies']):
-                if paragraph.runs:
-                    paragraph.runs[0].text = new_text
-    else:
-        # Replace entire document (for cover letter)
-        new_paragraphs = [p for p in new_text.split('\n') if p.strip()]
-        
-        para_index = 0
-        for paragraph in doc.paragraphs:
-            if para_index >= len(new_paragraphs):
-                break
-            if paragraph.text.strip() and paragraph.runs:
-                paragraph.runs[0].text = new_paragraphs[para_index]
-                for run in paragraph.runs[1:]:
-                    run.text = ""
-                para_index += 1
-    
-    # Save to BytesIO
-    output = BytesIO()
-    doc.save(output)
-    output.seek(0)
-    return output
+    return call_openai(prompt)
 
 def process_application(job_description):
     """Process the entire application tailoring"""
@@ -170,7 +175,10 @@ def process_application(job_description):
         return None, None, "Failed to read documents"
     
     # Get tailored content from AI
-    result = tailor_with_ai(cv_text, cover_text, job_description)
+    try:
+        result = tailor_with_ai(cv_text, cover_text, job_description)
+    except Exception as e:
+        return None, None, f"AI processing failed: {str(e)}"
     
     if not result:
         return None, None, "AI processing failed"
@@ -221,7 +229,6 @@ def process_application(job_description):
     except Exception as e:
         return None, None, f"Document generation error: {str(e)}"
 
-# Routes
 @app.route('/')
 def index():
     """Main dashboard page"""
@@ -248,7 +255,7 @@ def tailor():
                 'message': 'Documents tailored successfully!',
                 'cv_filename': f'Tailored_CV_{timestamp}.docx',
                 'cover_filename': f'Tailored_Cover_{timestamp}.docx',
-                'cv_data': cv_output.getvalue().decode('latin1'),  # Convert to base64
+                'cv_data': cv_output.getvalue().decode('latin1'),
                 'cover_data': cover_output.getvalue().decode('latin1')
             })
         else:
@@ -261,8 +268,8 @@ def tailor():
 def download_cv():
     """Download tailored CV"""
     try:
-        # For demonstration - in production, you'd store the file
-        cv_output, _, _ = process_application(request.args.get('job_description', ''))
+        job_description = request.args.get('job_description', '')
+        cv_output, _, _ = process_application(job_description)
         if cv_output:
             return send_file(
                 cv_output,
@@ -278,7 +285,8 @@ def download_cv():
 def download_cover():
     """Download tailored cover letter"""
     try:
-        _, cover_output, _ = process_application(request.args.get('job_description', ''))
+        job_description = request.args.get('job_description', '')
+        _, cover_output, _ = process_application(job_description)
         if cover_output:
             return send_file(
                 cover_output,
