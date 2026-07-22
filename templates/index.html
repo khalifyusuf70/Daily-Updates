@@ -285,6 +285,18 @@
             font-size: 12px;
         }
 
+        .success-message {
+            color: #4CAF50;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
+        .error-message {
+            color: #f44336;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -418,15 +430,31 @@ Include responsibilities, requirements, qualifications, and company description.
 
                     // Show preview
                     const preview = document.getElementById('previewContent');
-                    preview.textContent = `CV Preview:\n${data.cv_data ? data.cv_data.substring(0, 500) : 'Preview not available'}\n\nCover Letter Preview:\n${data.cover_data ? data.cover_data.substring(0, 500) : 'Preview not available'}`;
+                    preview.textContent = '✅ Documents generated successfully!\n\nClick the download buttons above to get your tailored CV and cover letter.\n\nFile names:\n- ' + data.cv_filename + '\n- ' + data.cover_filename;
 
                     // Enable download buttons
                     document.getElementById('downloadCV').onclick = function() {
-                        downloadFile(data.cv_data, data.cv_filename, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                        if (window.tailoredData && window.tailoredData.cv_data) {
+                            downloadFile(
+                                window.tailoredData.cv_data, 
+                                window.tailoredData.cv_filename, 
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                            );
+                        } else {
+                            alert('Please process a job description first.');
+                        }
                     };
                     
                     document.getElementById('downloadCover').onclick = function() {
-                        downloadFile(data.cover_data, data.cover_filename, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                        if (window.tailoredData && window.tailoredData.cover_data) {
+                            downloadFile(
+                                window.tailoredData.cover_data, 
+                                window.tailoredData.cover_filename, 
+                                'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                            );
+                        } else {
+                            alert('Please process a job description first.');
+                        }
                     };
 
                 } else {
@@ -448,28 +476,35 @@ Include responsibilities, requirements, qualifications, and company description.
             }
         });
 
-        function downloadFile(data, filename, mimeType) {
-            if (!data) {
+        function downloadFile(base64Data, filename, mimeType) {
+            if (!base64Data) {
                 alert('File data not available. Please process the job description first.');
                 return;
             }
 
-            // Decode from Latin-1 encoding
-            const byteCharacters = atob(data);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            try {
+                // Decode from base64
+                const byteCharacters = atob(base64Data);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const blob = new Blob([byteArray], { type: mimeType });
+                
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = filename;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(link.href);
+                
+                console.log('✅ Download started:', filename);
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download file. Please try again.');
             }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: mimeType });
-            
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(link.href);
         }
 
         // Auto-resize textarea
@@ -484,6 +519,9 @@ Include responsibilities, requirements, qualifications, and company description.
                 document.getElementById('tailorForm').dispatchEvent(new Event('submit'));
             }
         });
+
+        console.log('✅ CV Tailor Dashboard loaded successfully!');
+        console.log('📝 Paste a job description and click "Tailor Application" to get started.');
     </script>
 </body>
 </html>
