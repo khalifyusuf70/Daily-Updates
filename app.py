@@ -1,5 +1,6 @@
 import os
 import json
+import base64
 from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, send_file, jsonify
@@ -7,6 +8,7 @@ from docx import Document
 from openai import OpenAI
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # ---------------------------
 # DEEPSEEK API CONFIGURATION
@@ -123,36 +125,42 @@ Return JSON:
 def process_application(job_description):
     """Process the entire application tailoring"""
     
+    # Check if files exist
     if not os.path.exists(CV_PATH):
-        return None, None, "CV file not found"
+        return None, None, f"CV file not found: {CV_PATH}"
     
     if not os.path.exists(COVER_PATH):
-        return None, None, "Cover letter template not found"
+        return None, None, f"Cover letter template not found: {COVER_PATH}"
     
+    # Read documents
     cv_text = read_docx(CV_PATH)
     cover_text = read_docx(COVER_PATH)
     
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
     
+    # Get tailored content from AI
     try:
         result = tailor_with_ai(cv_text, cover_text, job_description)
     except Exception as e:
         return None, None, f"AI processing failed: {str(e)}"
     
     if not result:
-        return None, None, "AI processing failed"
+        return None, None, "AI returned empty result"
     
+    # Generate tailored documents
     try:
-        # Tailor CV
+        # Tailor CV - replace only summary and skills
         cv_doc = Document(CV_PATH)
         
+        # Update summary
         for paragraph in cv_doc.paragraphs:
             text_lower = paragraph.text.lower()
             if any(keyword in text_lower for keyword in ['summary', 'profile', 'about']):
                 if paragraph.runs:
                     paragraph.runs[0].text = result.get('tailored_summary', paragraph.text)
         
+        # Update skills
         for paragraph in cv_doc.paragraphs:
             text_lower = paragraph.text.lower()
             if any(keyword in text_lower for keyword in ['skill', 'core', 'competencies']):
@@ -188,28 +196,35 @@ def process_application(job_description):
 
 @app.route('/')
 def index():
+    """Main dashboard page"""
     return render_template('index.html')
 
 @app.route('/tailor', methods=['POST'])
 def tailor():
+    """Process job description and return tailored documents"""
     try:
         job_description = request.form.get('job_description', '').strip()
         
         if not job_description:
             return jsonify({'error': 'Please paste a job description'}), 400
         
+        # Process the application
         cv_output, cover_output, message = process_application(job_description)
         
         if cv_output and cover_output:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            # Convert to base64 for safe JSON transmission
+            cv_base64 = base64.b64encode(cv_output.getvalue()).decode('utf-8')
+            cover_base64 = base64.b64encode(cover_output.getvalue()).decode('utf-8')
             
             return jsonify({
                 'success': True,
                 'message': 'Documents tailored successfully!',
                 'cv_filename': f'Tailored_CV_{timestamp}.docx',
                 'cover_filename': f'Tailored_Cover_{timestamp}.docx',
-                'cv_data': cv_output.getvalue().decode('latin1'),
-                'cover_data': cover_output.getvalue().decode('latin1')
+                'cv_data': cv_base64,
+                'cover_data': cover_base64
             })
         else:
             return jsonify({'error': message}), 500
