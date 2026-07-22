@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CV & Cover Letter Tailor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+            animation: slideUp 0.5s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            color: #666;
+            margin-top: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 200px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .form-group textarea::placeholder {
+            color: #999;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            margin-top: 15px;
+            color: #666;
+        }
+
+        .result {
+            display: none;
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .result.success {
+            border-left-color: #4CAF50;
+        }
+
+        .result.error {
+            border-left-color: #f44336;
+        }
+
+        .result h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .result p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .download-buttons {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .download-btn {
+            padding: 12px 20px;
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .download-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .download-btn.cv {
+            border-color: #667eea;
+        }
+
+        .download-btn.cover {
+            border-color: #764ba2;
+        }
+
+        .download-btn.cover:hover {
+            background: #764ba2;
+            border-color: #764ba2;
+        }
+
+        .preview-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #eee;
+        }
+
+        .preview-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .preview-content {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #444;
+            white-space: pre-wrap;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #999;
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 20px;
+            }
+
+            .download-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 CV & Cover Letter Tailor</h1>
+            <p>Paste a job description and get tailored documents instantly</p>
+        </div>
+
+        <form id="tailorForm">
+            <div class="form-group">
+                <label for="jobDescription">
+                    📋 Job Description
+                    <span class="badge">AI-powered</span>
+                </label>
+                <textarea 
+                    id="jobDescription" 
+                    name="job_description" 
+                    placeholder="Paste the complete job description from LinkedIn or any job board...
+                    
+Include responsibilities, requirements, qualifications, and company description."
+                    required
+                ></textarea>
+            </div>
+
+            <button type="submit" class="btn" id="submitBtn">
+                🎯 Tailor Application
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <p>🤖 AI is tailoring your documents... This takes 10-20 seconds</p>
+        </div>
+
+        <div class="result" id="result">
+            <h3 id="resultTitle">✅ Documents Ready!</h3>
+            <p id="resultMessage">Your tailored CV and cover letter are ready for download.</p>
+            
+            <div class="download-buttons">
+                <button class="download-btn cv" id="downloadCV">
+                    📥 Download Tailored CV
+                </button>
+                <button class="download-btn cover" id="downloadCover">
+                    ✉️ Download Cover Letter
+                </button>
+            </div>
+
+            <div class="stats">
+                <div class="stat-item">
+                    <div class="stat-number" id="wordCount">0</div>
+                    <div class="stat-label">Words in Job Description</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="processingTime">0s</div>
+                    <div class="stat-label">Processing Time</div>
+                </div>
+            </div>
+
+            <div class="preview-section">
+                <h3>📄 Preview</h3>
+                <div class="preview-content" id="previewContent">
+                    Your tailored documents will appear here...
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            🔒 Your documents are processed securely. No data is permanently stored.
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('tailorForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const jobDescription = document.getElementById('jobDescription').value.trim();
+            if (!jobDescription) {
+                alert('Please paste a job description first!');
+                return;
+            }
+
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = '⏳ Processing...';
+
+            const startTime = Date.now();
+
+            try {
+                const response = await fetch('/tailor', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: new URLSearchParams({
+                        job_description: jobDescription
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store data for download
+                    window.tailoredData = data;
+                    window.jobDescription = jobDescription;
+
+                    // Show results
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('result').className = 'result success';
+                    document.getElementById('resultTitle').textContent = '✅ Documents Tailored Successfully!';
+                    document.getElementById('resultMessage').textContent = 'Your documents are ready for download.';
+
+                    // Update stats
+                    document.getElementById('wordCount').textContent = jobDescription.split(/\s+/).length;
+                    document.getElementById('processingTime').textContent = ((Date.now() - startTime) / 1000).toFixed(1) + 's';
+
+                    // Show preview
+                    const preview = document.getElementById('previewContent');
+                    preview.textContent = `CV Preview:\n${data.cv_data ? data.cv_data.substring(0, 500) : 'Preview not available'}\n\nCover Letter Preview:\n${data.cover_data ? data.cover_data.substring(0, 500) : 'Preview not available'}`;
+
+                    // Enable download buttons
+                    document.getElementById('downloadCV').onclick = function() {
+                        downloadFile(data.cv_data, data.cv_filename, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                    };
+                    
+                    document.getElementById('downloadCover').onclick = function() {
+                        downloadFile(data.cover_data, data.cover_filename, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+                    };
+
+                } else {
+                    document.getElementById('result').style.display = 'block';
+                    document.getElementById('result').className = 'result error';
+                    document.getElementById('resultTitle').textContent = '❌ Error';
+                    document.getElementById('resultMessage').textContent = data.error || 'Something went wrong. Please try again.';
+                }
+
+            } catch (error) {
+                document.getElementById('result').style.display = 'block';
+                document.getElementById('result').className = 'result error';
+                document.getElementById('resultTitle').textContent = '❌ Error';
+                document.getElementById('resultMessage').textContent = 'Network error. Please check your connection and try again.';
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('submitBtn').disabled = false;
+                document.getElementById('submitBtn').textContent = '🎯 Tailor Application';
+            }
+        });
+
+        function downloadFile(data, filename, mimeType) {
+            if (!data) {
+                alert('File data not available. Please process the job description first.');
+                return;
+            }
+
+            // Decode from Latin-1 encoding
+            const byteCharacters = atob(data);
+            const byteNumbers = new Array(byteCharacters.length);
+            for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+            }
+            const byteArray = new Uint8Array(byteNumbers);
+            const blob = new Blob([byteArray], { type: mimeType });
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        }
+
+        // Auto-resize textarea
+        document.getElementById('jobDescription').addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 400) + 'px';
+        });
+
+        // Keyboard shortcut: Ctrl+Enter to submit
+        document.getElementById('jobDescription').addEventListener('keydown', function(e) {
+            if (e.ctrlKey && e.key === 'Enter') {
+                document.getElementById('tailorForm').dispatchEvent(new Event('submit'));
+            }
+        });
+    </script>
+</body>
+</html>
