@@ -56,11 +56,6 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-def get_docx_paragraphs(file_path):
-    """Get all paragraphs from DOCX with their indices"""
-    doc = Document(file_path)
-    return [(i, para) for i, para in enumerate(doc.paragraphs)]
-
 def tailor_cv_deep(cv_text, job_description):
     """Deep tailoring of CV to match job description"""
     
@@ -74,7 +69,7 @@ def tailor_cv_deep(cv_text, job_description):
     for line in lines:
         line_lower = line.lower().strip()
         
-        # Detect sections by text content (not #)
+        # Detect sections
         if 'summary' in line_lower and len(line) < 50:
             in_summary = True
             in_skills = False
@@ -166,12 +161,12 @@ Return ONLY the cover letter text.
 
 def update_docx_sections(template_path, new_summary, new_skills):
     """
-    Update ONLY summary and skills sections.
-    Uses actual paragraph text without # symbols.
+    SAFELY update ONLY summary and skills sections.
+    PRESERVES experience and education sections.
     """
     doc = Document(template_path)
     
-    # Find the exact positions of section headers (looking at the actual text)
+    # Find exact positions of section headers
     summary_pos = -1
     skills_pos = -1
     experience_pos = -1
@@ -180,30 +175,37 @@ def update_docx_sections(template_path, new_summary, new_skills):
     for i, para in enumerate(doc.paragraphs):
         text = para.text.lower().strip()
         
-        # Look for section headers in the actual text
         if 'summary' in text and len(text) < 30:
             summary_pos = i
-            print(f"📍 Found SUMMARY at position {i}: '{para.text}'")
+            print(f"📍 Found SUMMARY at position {i}")
         elif 'skill' in text and len(text) < 30:
             skills_pos = i
-            print(f"📍 Found SKILLS at position {i}: '{para.text}'")
+            print(f"📍 Found SKILLS at position {i}")
         elif 'experience' in text and len(text) < 30:
             experience_pos = i
-            print(f"📍 Found EXPERIENCE at position {i}: '{para.text}'")
-            break  # Stop after experience
+            print(f"📍 Found EXPERIENCE at position {i}")
+        elif 'education' in text and len(text) < 30:
+            education_pos = i
+            print(f"📍 Found EDUCATION at position {i}")
     
-    print(f"📍 Positions - Summary: {summary_pos}, Skills: {skills_pos}, Experience: {experience_pos}")
+    print(f"📍 Positions: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}, Education={education_pos}")
     
-    # --- UPDATE SUMMARY ---
+    # --- UPDATE SUMMARY (SAFELY) ---
     if summary_pos != -1 and new_summary:
         print(f"📝 Updating summary at position {summary_pos}")
         
-        # Find end of summary (before skills or experience)
+        # Find end of summary (BEFORE skills or experience)
         end_pos = len(doc.paragraphs)
         if skills_pos != -1 and skills_pos > summary_pos:
             end_pos = skills_pos
         elif experience_pos != -1 and experience_pos > summary_pos:
             end_pos = experience_pos
+        
+        print(f"  Summary range: {summary_pos+1} to {end_pos-1}")
+        
+        # Count how many paragraphs to clear
+        clear_count = end_pos - summary_pos - 1
+        print(f"  Clearing {clear_count} paragraphs")
         
         # Clear content between summary header and next header
         for i in range(summary_pos + 1, end_pos):
@@ -216,7 +218,7 @@ def update_docx_sections(template_path, new_summary, new_skills):
                 else:
                     para.text = ""
         
-        # Insert new summary as a single paragraph
+        # Insert new summary
         if summary_pos + 1 < len(doc.paragraphs):
             para = doc.paragraphs[summary_pos + 1]
             if para.runs:
@@ -227,16 +229,22 @@ def update_docx_sections(template_path, new_summary, new_skills):
                 para.text = new_summary
             print(f"✅ Updated summary")
     
-    # --- UPDATE SKILLS ---
+    # --- UPDATE SKILLS (SAFELY) ---
     if skills_pos != -1 and new_skills:
         print(f"📝 Updating skills at position {skills_pos}")
         
-        # Find end of skills (before experience)
+        # Find end of skills (BEFORE experience)
         end_pos = len(doc.paragraphs)
         if experience_pos != -1 and experience_pos > skills_pos:
             end_pos = experience_pos
         elif education_pos != -1 and education_pos > skills_pos:
             end_pos = education_pos
+        
+        print(f"  Skills range: {skills_pos+1} to {end_pos-1}")
+        
+        # Count how many paragraphs to clear
+        clear_count = end_pos - skills_pos - 1
+        print(f"  Clearing {clear_count} paragraphs")
         
         # Clear content between skills header and next header
         for i in range(skills_pos + 1, end_pos):
@@ -251,16 +259,26 @@ def update_docx_sections(template_path, new_summary, new_skills):
         
         # Insert new skills
         skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
+        print(f"  Inserting {len(skills_lines)} skill lines")
         
-        for i, line in enumerate(skills_lines):
+        # Only insert up to the available paragraphs
+        max_lines = min(len(skills_lines), end_pos - skills_pos - 1)
+        
+        for i in range(max_lines):
             if skills_pos + 1 + i < len(doc.paragraphs):
                 para = doc.paragraphs[skills_pos + 1 + i]
                 if para.runs:
-                    para.runs[0].text = line
+                    para.runs[0].text = skills_lines[i]
                     for run in para.runs[1:]:
                         run.text = ""
                 else:
-                    para.text = line
+                    para.text = skills_lines[i]
+        
+        # If we have more skills than paragraphs, add them
+        if len(skills_lines) > max_lines:
+            for i in range(max_lines, len(skills_lines)):
+                doc.paragraphs[skills_pos + 1 + i].text = skills_lines[i]
+        
         print(f"✅ Updated skills with {len(skills_lines)} lines")
     
     output = BytesIO()
