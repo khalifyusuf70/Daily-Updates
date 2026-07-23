@@ -1,5 +1,3 @@
-# app.py (copy this entire file exactly)
-
 import os
 import json
 import base64
