@@ -16,7 +16,7 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 # ---------------------------
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
-    print("⚠️ DEEPSEEK_API_KEY not set. Please set it in environment variables.")
+    print("⚠️ DEEPSEEK_API_KEY not set")
 
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
@@ -44,7 +44,7 @@ def call_deepseek(prompt):
         raise e
 
 def read_docx(file_path):
-    """Extract text from .docx file with paragraph structure"""
+    """Extract text from .docx file preserving structure"""
     try:
         doc = Document(file_path)
         paragraphs = []
@@ -56,84 +56,77 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-def extract_sections(text):
-    """Extract sections from CV text more intelligently"""
+def extract_sections_with_indices(text):
+    """Extract sections with their starting indices"""
+    lines = text.split('\n')
     sections = {
-        "summary": "",
-        "skills": "",
-        "experience": "",
-        "education": ""
+        "summary": {"start": -1, "end": -1, "content": ""},
+        "skills": {"start": -1, "end": -1, "content": ""},
+        "experience": {"start": -1, "end": -1, "content": ""},
+        "education": {"start": -1, "end": -1, "content": ""}
     }
     
-    lines = text.split('\n')
-    current_section = None
-    
-    # Keywords for section detection
     section_keywords = {
         "summary": ["summary", "profile", "about"],
-        "skills": ["skill", "core competencies", "expertise"],
+        "skills": ["skill", "core competencies", "expertise", "skill highlights"],
         "experience": ["experience", "employment", "work history"],
         "education": ["education", "academic", "qualification"]
     }
     
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-            
-        line_lower = line.lower()
-        section_found = False
+    current_section = None
+    for i, line in enumerate(lines):
+        line_lower = line.lower().strip()
         
         # Check if this line is a section header
         for section, keywords in section_keywords.items():
             if any(keyword in line_lower for keyword in keywords):
+                if current_section:
+                    sections[current_section]["end"] = i - 1
                 current_section = section
-                section_found = True
+                if sections[current_section]["start"] == -1:
+                    sections[current_section]["start"] = i
                 break
         
-        # If not a header, add to current section
-        if not section_found and current_section:
-            # Clean up formatting artifacts
-            clean_line = re.sub(r'\{#.*?\}', '', line)  # Remove {#...}
-            clean_line = re.sub(r'\.Styl\d+', '', clean_line)  # Remove .Styl classes
-            if clean_line.strip():
-                sections[current_section] += clean_line + "\n"
+        # Add content to current section
+        if current_section and sections[current_section]["start"] != -1:
+            # Skip section header lines
+            if sections[current_section]["start"] != i:
+                clean_line = re.sub(r'\{#.*?\}', '', line)
+                clean_line = re.sub(r'\.Styl\d+', '', clean_line)
+                if clean_line.strip():
+                    sections[current_section]["content"] += clean_line + "\n"
     
     return sections
 
-def tailor_cv_with_ai(cv_text, job_description):
-    """Get tailored content from DeepSeek with specific instructions"""
+def tailor_with_ai(cv_text, job_description):
+    """Get tailored content from DeepSeek"""
     
-    sections = extract_sections(cv_text)
+    sections = extract_sections_with_indices(cv_text)
     
     prompt = f"""
-You are a professional CV tailor. Your task is to rewrite ONLY the SUMMARY and SKILLS sections.
+You are a professional CV tailor. Rewrite ONLY the SUMMARY and SKILLS sections.
 
-Current CV Sections:
-SUMMARY:
-{sections['summary']}
+Current SUMMARY:
+{sections['summary']['content'][:500]}
 
-SKILLS:
-{sections['skills']}
-
-EXPERIENCE (DO NOT CHANGE):
-{sections['experience'][:500]}...
+Current SKILLS:
+{sections['skills']['content'][:500]}
 
 JOB DESCRIPTION:
 {job_description}
 
-INSTRUCTIONS:
-1. Rewrite ONLY the SUMMARY section to perfectly match the job requirements
-2. Rewrite ONLY the SKILLS section to highlight skills from the job description
+IMPORTANT RULES:
+1. Rewrite ONLY the summary section to match the job
+2. Rewrite ONLY the skills section to match the job
 3. Keep ALL experience, education, and other sections EXACTLY as they are
-4. Use keywords and phrases from the job description naturally
-5. NEVER add experience or qualifications not in the CV
-6. Keep the same tone and style as the original
+4. Use keywords from the job description
+5. NEVER add experience not in the CV
+6. Keep the same professional tone
 
 Return JSON:
 {{
-    "tailored_summary": "new summary here (1-2 paragraphs)",
-    "tailored_skills": "new skills here (bullet points or list)"
+    "tailored_summary": "new summary (1-2 paragraphs)",
+    "tailored_skills": "new skills list (bullet points or list)"
 }}
 """
     
@@ -142,29 +135,29 @@ Return JSON:
 def tailor_cover_with_ai(cover_text, cv_text, job_description):
     """Generate tailored cover letter"""
     
-    sections = extract_sections(cv_text)
+    sections = extract_sections_with_indices(cv_text)
     
     prompt = f"""
-You are a professional cover letter writer. Create a tailored cover letter.
+You are a professional cover letter writer.
 
-CV SUMMARY (use this for context):
-{sections['summary']}
+CV SUMMARY (use for context):
+{sections['summary']['content'][:500]}
 
 JOB DESCRIPTION:
 {job_description}
 
-COVER LETTER TEMPLATE (use this structure):
+COVER LETTER TEMPLATE:
 {cover_text}
 
 INSTRUCTIONS:
-1. Write a compelling cover letter using the template structure
-2. Highlight the most relevant experience from the CV
+1. Use the template structure
+2. Highlight relevant experience from the CV
 3. Match keywords from the job description
-4. Keep it professional and concise (3-4 paragraphs)
-5. Include specific examples from the CV that match the job requirements
-6. DO NOT fabricate any experience or qualifications
+4. Include specific examples from the CV
+5. Keep it professional and concise (3-4 paragraphs)
+6. DO NOT fabricate experience
 
-Return ONLY the cover letter text, no JSON.
+Return ONLY the cover letter text.
 """
     
     try:
@@ -179,60 +172,82 @@ Return ONLY the cover letter text, no JSON.
         return response.choices[0].message.content
     except Exception as e:
         print(f"Cover letter error: {str(e)}")
-        return cover_text  # Return original if fails
+        return cover_text
 
-def preserve_formatting_and_tailor(template_path, new_summary, new_skills, output_path=None):
+def update_docx_sections(template_path, new_summary, new_skills):
     """
-    Preserve exact formatting while updating only summary and skills sections
+    Update ONLY summary and skills sections while preserving everything else
     """
     doc = Document(template_path)
     
-    summary_found = False
-    skills_found = False
-    
-    # First pass: find section headers
+    # Find section headers and their positions
     section_positions = []
+    section_keywords = {
+        "summary": ["summary", "profile", "about"],
+        "skills": ["skill", "core competencies", "expertise", "skill highlights"],
+        "experience": ["experience", "employment", "work history"],
+        "education": ["education", "academic"]
+    }
+    
     for i, paragraph in enumerate(doc.paragraphs):
         text_lower = paragraph.text.lower().strip()
-        if any(keyword in text_lower for keyword in ['summary', 'profile']):
-            section_positions.append(('summary', i))
-        elif any(keyword in text_lower for keyword in ['skill', 'core competencies']):
-            section_positions.append(('skills', i))
-        elif any(keyword in text_lower for keyword in ['experience', 'education']):
-            # Stop processing after experience section
-            break
-    
-    # Process sections
-    for section_type, start_idx in section_positions:
-        # Find the end of this section (next section header or end of document)
-        end_idx = len(doc.paragraphs)
-        for next_type, next_idx in section_positions:
-            if next_idx > start_idx:
-                end_idx = next_idx
+        for section, keywords in section_keywords.items():
+            if any(keyword in text_lower for keyword in keywords):
+                section_positions.append((section, i))
                 break
+    
+    # Update summary section
+    if new_summary and section_positions:
+        summary_start = -1
+        summary_end = -1
+        skills_start = -1
         
-        # Update the section content
-        if section_type == 'summary' and new_summary:
-            # Replace the summary paragraph(s)
+        # Find summary and skills positions
+        for section, idx in section_positions:
+            if section == "summary":
+                summary_start = idx
+            elif section == "skills":
+                skills_start = idx
+        
+        # If summary found, update it
+        if summary_start != -1:
+            # Find where summary ends (before skills or experience)
+            summary_end = len(doc.paragraphs)
+            for section, idx in section_positions:
+                if idx > summary_start and section in ["skills", "experience", "education"]:
+                    summary_end = idx
+                    break
+            
+            # Replace summary content
             summary_lines = [p.strip() for p in new_summary.split('\n') if p.strip()]
+            line_idx = summary_start + 1  # Start after header
+            
             for i, line in enumerate(summary_lines):
-                if start_idx + i < end_idx and start_idx + i < len(doc.paragraphs):
-                    para = doc.paragraphs[start_idx + i]
+                if line_idx + i < summary_end and line_idx + i < len(doc.paragraphs):
+                    para = doc.paragraphs[line_idx + i]
                     if para.runs:
                         para.runs[0].text = line
-                        # Clear other runs
                         for run in para.runs[1:]:
                             run.text = ""
                     else:
-                        # If no runs, create one
                         para.text = line
         
-        elif section_type == 'skills' and new_skills:
-            # Replace the skills section
+        # Update skills section
+        if new_skills and skills_start != -1:
+            # Find where skills ends
+            skills_end = len(doc.paragraphs)
+            for section, idx in section_positions:
+                if idx > skills_start and section in ["experience", "education"]:
+                    skills_end = idx
+                    break
+            
+            # Replace skills content
             skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
+            line_idx = skills_start + 1  # Start after header
+            
             for i, line in enumerate(skills_lines):
-                if start_idx + i < end_idx and start_idx + i < len(doc.paragraphs):
-                    para = doc.paragraphs[start_idx + i]
+                if line_idx + i < skills_end and line_idx + i < len(doc.paragraphs):
+                    para = doc.paragraphs[line_idx + i]
                     if para.runs:
                         para.runs[0].text = line
                         for run in para.runs[1:]:
@@ -249,49 +264,43 @@ def preserve_formatting_and_tailor(template_path, new_summary, new_skills, outpu
 def process_application(job_description):
     """Process the entire application tailoring"""
     
-    # Check if files exist
     if not os.path.exists(CV_PATH):
         return None, None, f"CV file not found: {CV_PATH}"
     
     if not os.path.exists(COVER_PATH):
         return None, None, f"Cover letter template not found: {COVER_PATH}"
     
-    # Read documents
     cv_text = read_docx(CV_PATH)
     cover_text = read_docx(COVER_PATH)
     
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
     
-    # Get tailored content from AI
     try:
-        print("🤖 Tailoring CV with DeepSeek...")
-        result = tailor_cv_with_ai(cv_text, job_description)
-        print(f"✅ CV Tailored: {result.keys() if result else 'None'}")
+        print("🤖 Tailoring CV...")
+        result = tailor_with_ai(cv_text, job_description)
+        print(f"✅ CV tailored: {result.keys() if result else 'None'}")
     except Exception as e:
         return None, None, f"CV tailoring failed: {str(e)}"
     
-    # Generate cover letter
     try:
         print("✍️ Generating cover letter...")
         tailored_cover = tailor_cover_with_ai(cover_text, cv_text, job_description)
-        print(f"✅ Cover letter generated: {len(tailored_cover) if tailored_cover else 0} characters")
+        print(f"✅ Cover letter generated")
     except Exception as e:
         tailored_cover = cover_text
-        print(f"⚠️ Cover letter generation failed, using template: {str(e)}")
+        print(f"⚠️ Cover letter generation failed: {str(e)}")
     
-    # Generate tailored documents with preserved formatting
     try:
-        print("📄 Generating tailored CV with formatting preserved...")
-        cv_output = preserve_formatting_and_tailor(
+        print("📄 Generating tailored CV...")
+        cv_output = update_docx_sections(
             CV_PATH,
             result.get('tailored_summary', ''),
             result.get('tailored_skills', '')
         )
-        print("✅ CV generated successfully")
+        print("✅ CV generated")
         
-        print("📄 Generating cover letter...")
-        # For cover letter, replace the entire content
+        # Generate cover letter
         cover_doc = Document(COVER_PATH)
         if tailored_cover:
             new_paragraphs = [p for p in tailored_cover.split('\n') if p.strip()]
@@ -305,7 +314,7 @@ def process_application(job_description):
         cover_output = BytesIO()
         cover_doc.save(cover_output)
         cover_output.seek(0)
-        print("✅ Cover letter generated successfully")
+        print("✅ Cover letter generated")
         
         return cv_output, cover_output, "Success"
         
@@ -314,7 +323,6 @@ def process_application(job_description):
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
     try:
         return render_template('index.html')
     except Exception as e:
@@ -322,14 +330,13 @@ def index():
 
 @app.route('/tailor', methods=['POST'])
 def tailor():
-    """Process job description and return tailored documents"""
     try:
         job_description = request.form.get('job_description', '').strip()
         
         if not job_description:
             return jsonify({'error': 'Please paste a job description'}), 400
         
-        print(f"📝 Processing job description: {len(job_description)} characters")
+        print(f"📝 Processing job: {len(job_description)} characters")
         
         cv_output, cover_output, message = process_application(job_description)
         
@@ -351,14 +358,13 @@ def tailor():
             return jsonify({'error': message}), 500
             
     except Exception as e:
-        print(f"❌ Error in /tailor: {str(e)}")
+        print(f"❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/health')
 def health():
-    """Health check endpoint"""
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
 if __name__ == '__main__':
