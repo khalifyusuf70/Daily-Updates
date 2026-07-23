@@ -119,15 +119,18 @@ JOB DESCRIPTION:
 INSTRUCTIONS:
 1. SUMMARY: Write 4-6 sentences that PERFECTLY match this job.
 2. SKILLS: List 10-12 skills as a bulleted list matching this job.
+   IMPORTANT: Each skill should be a single line starting with a bullet (• or -)
 
 Return ONLY JSON:
 {{
     "tailored_summary": "new summary here",
-    "tailored_skills": "skill 1\\nskill 2\\nskill 3"
+    "tailored_skills": "• Skill 1\\n• Skill 2\\n• Skill 3"
 }}
 """
     
-    return call_deepseek(prompt)
+    result = call_deepseek(prompt)
+    print(f"📝 AI returned skills: {result.get('tailored_skills', '')[:100]}...")
+    return result
 
 def tailor_cover_letter_deep(cover_text, cv_text, job_description):
     """Generate deeply tailored cover letter"""
@@ -200,11 +203,10 @@ def update_docx_sections(template_path, new_summary, new_skills):
     if summary_pos != -1 and new_summary:
         print(f"\n📝 Updating summary at position {summary_pos}")
         
-        # Summary ends BEFORE skills
         end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         print(f"  Summary range: {summary_pos+1} to {end_pos-1}")
         
-        # Clear content between summary header and skills header
+        # Clear content
         for i in range(summary_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -234,7 +236,7 @@ def update_docx_sections(template_path, new_summary, new_skills):
         end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
         print(f"  Skills range: {skills_pos+1} to {end_pos-1}")
         
-        # Clear content between skills header and experience header
+        # Clear content
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -245,19 +247,33 @@ def update_docx_sections(template_path, new_summary, new_skills):
                 else:
                     para.text = ""
         
-        # Insert new skills
-        skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
+        # Insert new skills - handle bullet points properly
+        skills_lines = []
+        for line in new_skills.split('\n'):
+            line = line.strip()
+            if line:
+                # Remove bullet symbols for cleaner insertion
+                clean_line = re.sub(r'^[•\-*]\s*', '', line)
+                if clean_line:
+                    skills_lines.append(clean_line)
+        
         print(f"  Inserting {len(skills_lines)} skill lines")
         
         for i, line in enumerate(skills_lines):
             if skills_pos + 1 + i < end_pos and skills_pos + 1 + i < len(doc.paragraphs):
                 para = doc.paragraphs[skills_pos + 1 + i]
+                # Format as bullet point if it wasn't already
+                display_line = line
+                if not display_line.startswith('•') and not display_line.startswith('-'):
+                    display_line = f"• {display_line}"
+                
                 if para.runs:
-                    para.runs[0].text = line
+                    para.runs[0].text = display_line
                     for run in para.runs[1:]:
                         run.text = ""
                 else:
-                    para.text = line
+                    para.text = display_line
+        
         print(f"✅ Updated skills with {len(skills_lines)} lines")
     
     output = BytesIO()
