@@ -11,11 +11,7 @@ from openai import OpenAI
 app = Flask(**name**)
 app.secret_key = os.environ.get("SECRET_KEY", "change-this-secret-key")
 
-# -----------------------------
-
 # DeepSeek API configuration
-
-# -----------------------------
 
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 
@@ -29,35 +25,31 @@ COVER_PATH = "Cover_Template.docx"
 
 def call_deepseek(prompt):
 """Call DeepSeek API and return parsed JSON."""
-
-```
 response = client.chat.completions.create(
-    model="deepseek-chat",
-    messages=[
-        {
-            "role": "system",
-            "content": "You are an expert CV tailoring assistant. Return ONLY valid JSON."
-        },
-        {
-            "role": "user",
-            "content": prompt
-        }
-    ],
-    temperature=0.4,
-    response_format={"type": "json_object"}
+model="deepseek-chat",
+messages=[
+{
+"role": "system",
+"content": "You are an expert CV tailoring assistant. Return ONLY valid JSON."
+},
+{
+"role": "user",
+"content": prompt
+}
+],
+temperature=0.4,
+response_format={"type": "json_object"}
 )
 
+```
 return json.loads(response.choices[0].message.content)
 ```
 
 def read_docx(file_path):
 """Extract text from a DOCX file."""
-
-```
 doc = Document(file_path)
 paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
 return "\n".join(paragraphs)
-```
 
 def tailor_cv_deep(cv_text, job_description):
 """Tailor summary, skills, and experience."""
