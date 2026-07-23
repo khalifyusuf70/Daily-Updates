@@ -56,65 +56,6 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-def get_docx_paragraphs(file_path):
-    """Get all paragraphs from DOCX with their indices"""
-    doc = Document(file_path)
-    return [(i, para) for i, para in enumerate(doc.paragraphs)]
-
-def extract_sections_by_header(doc):
-    """Extract sections based on header detection"""
-    sections = {
-        'summary': {'start': -1, 'end': -1, 'content': ''},
-        'skills': {'start': -1, 'end': -1, 'content': ''},
-        'experience': {'start': -1, 'end': -1, 'content': ''},
-        'education': {'start': -1, 'end': -1, 'content': ''}
-    }
-    
-    current_section = None
-    section_headers = {
-        'summary': ['summary', 'profile', 'professional summary'],
-        'skills': ['skill', 'core competencies', 'expertise', 'skill highlights'],
-        'experience': ['experience', 'employment', 'work history', 'professional experience'],
-        'education': ['education', 'academic', 'qualification']
-    }
-    
-    for i, para in enumerate(doc.paragraphs):
-        text = para.text.strip().lower()
-        
-        # Check if this is a section header
-        found_section = None
-        for section, keywords in section_headers.items():
-            if any(keyword in text for keyword in keywords):
-                found_section = section
-                break
-        
-        if found_section:
-            current_section = found_section
-            if sections[current_section]['start'] == -1:
-                sections[current_section]['start'] = i
-            continue
-        
-        # If we're in a section, collect content
-        if current_section and sections[current_section]['start'] != -1:
-            # Skip the header line itself
-            if sections[current_section]['start'] != i:
-                clean_text = re.sub(r'\{#.*?\}', '', para.text)
-                clean_text = re.sub(r'\.Styl\d+', '', clean_text)
-                if clean_text.strip():
-                    sections[current_section]['content'] += clean_text + "\n"
-    
-    # Set end positions
-    section_names = list(sections.keys())
-    for i, section in enumerate(section_names):
-        if i < len(section_names) - 1:
-            next_section = section_names[i + 1]
-            if sections[next_section]['start'] != -1:
-                sections[section]['end'] = sections[next_section]['start']
-        if sections[section]['end'] == -1:
-            sections[section]['end'] = len(doc.paragraphs)
-    
-    return sections
-
 def tailor_cv_deep(cv_text, job_description):
     """Deep tailoring of CV to match job description"""
     
@@ -155,31 +96,31 @@ def tailor_cv_deep(cv_text, job_description):
     print(f"📝 Extracted Summary: {current_summary[:100]}...")
     print(f"📝 Extracted Skills: {current_skills[:100]}...")
     
-    # If we didn't find sections, use defaults
     if not current_summary:
-        current_summary = "Senior professional with 10+ years of experience in government and international development sectors. Expert in strategic leadership, programme growth, resource mobilization, and donor engagement."
+        current_summary = "Senior professional with 10+ years of experience in government and international development sectors."
     if not current_skills:
-        current_skills = "Resource Mobilization, Grants Management, Stakeholder Engagement, Strategic Leadership, Donor Relations, Partnership Development"
+        current_skills = "Resource Mobilization, Grants Management, Stakeholder Engagement, Strategic Leadership"
     
-    # Analyze job description to determine role type
     prompt = f"""
 You are a professional CV tailor. Rewrite the SUMMARY and SKILLS sections to PERFECTLY match this job.
 
-CURRENT SUMMARY (REWRITE THIS):
+CURRENT SUMMARY:
 {current_summary}
 
-CURRENT SKILLS (REWRITE THIS):
+CURRENT SKILLS:
 {current_skills}
 
 JOB DESCRIPTION:
 {job_description}
 
-The new summary and skills must be specifically tailored to this exact job.
+INSTRUCTIONS:
+1. SUMMARY: Write 2-3 sentences that directly match the job requirements. Use keywords from the job description.
+2. SKILLS: List 8-12 skills that directly match the job requirements. Format as a bulleted list or comma-separated.
 
 Return ONLY JSON:
 {{
-    "tailored_summary": "new summary that directly matches the job requirements",
-    "tailored_skills": "new skills list that directly matches the job requirements"
+    "tailored_summary": "2-3 sentences that perfectly match the job",
+    "tailored_skills": "8-12 skills as a bulleted list or comma-separated"
 }}
 """
     
@@ -218,7 +159,7 @@ def update_docx_sections(template_path, new_summary, new_skills):
     """Update ONLY summary and skills sections in the DOCX"""
     doc = Document(template_path)
     
-    # First, find section header positions
+    # Find section header positions
     header_indices = {}
     section_headers = {
         'summary': ['summary', 'profile'],
@@ -240,19 +181,32 @@ def update_docx_sections(template_path, new_summary, new_skills):
     # Update summary section
     if 'summary' in header_indices and new_summary:
         summary_idx = header_indices['summary']
-        # Find next section header
         next_header = len(doc.paragraphs)
         for section, idx in header_indices.items():
             if idx > summary_idx and idx < next_header:
                 next_header = idx
         
-        # Replace summary content (skip the header line)
+        # Clear ALL existing content between header and next header
+        for i in range(summary_idx + 1, next_header):
+            if i < len(doc.paragraphs):
+                para = doc.paragraphs[i]
+                if para.runs:
+                    para.runs[0].text = ""
+                    for run in para.runs[1:]:
+                        run.text = ""
+                else:
+                    para.text = ""
+        
+        # Insert new content
         summary_lines = [p.strip() for p in new_summary.split('\n') if p.strip()]
-        line_idx = summary_idx + 1
+        if len(summary_lines) == 1 and len(summary_lines[0]) > 100:
+            sentences = [s.strip() + '.' for s in summary_lines[0].split('.') if s.strip()]
+            if len(sentences) > 1:
+                summary_lines = sentences
         
         for i, line in enumerate(summary_lines):
-            if line_idx + i < next_header and line_idx + i < len(doc.paragraphs):
-                para = doc.paragraphs[line_idx + i]
+            if summary_idx + 1 + i < len(doc.paragraphs):
+                para = doc.paragraphs[summary_idx + 1 + i]
                 if para.runs:
                     para.runs[0].text = line
                     for run in para.runs[1:]:
@@ -264,19 +218,30 @@ def update_docx_sections(template_path, new_summary, new_skills):
     # Update skills section
     if 'skills' in header_indices and new_skills:
         skills_idx = header_indices['skills']
-        # Find next section header
         next_header = len(doc.paragraphs)
         for section, idx in header_indices.items():
             if idx > skills_idx and idx < next_header:
                 next_header = idx
         
-        # Replace skills content (skip the header line)
+        # Clear ALL existing content between header and next header
+        for i in range(skills_idx + 1, next_header):
+            if i < len(doc.paragraphs):
+                para = doc.paragraphs[i]
+                if para.runs:
+                    para.runs[0].text = ""
+                    for run in para.runs[1:]:
+                        run.text = ""
+                else:
+                    para.text = ""
+        
+        # Insert new content
         skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
-        line_idx = skills_idx + 1
+        if len(skills_lines) == 1 and ',' in skills_lines[0]:
+            skills_lines = [s.strip() for s in skills_lines[0].split(',') if s.strip()]
         
         for i, line in enumerate(skills_lines):
-            if line_idx + i < next_header and line_idx + i < len(doc.paragraphs):
-                para = doc.paragraphs[line_idx + i]
+            if skills_idx + 1 + i < len(doc.paragraphs):
+                para = doc.paragraphs[skills_idx + 1 + i]
                 if para.runs:
                     para.runs[0].text = line
                     for run in para.runs[1:]:
