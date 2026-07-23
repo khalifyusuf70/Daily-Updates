@@ -162,18 +162,20 @@ Return ONLY the cover letter text.
 def update_docx_sections(template_path, new_summary, new_skills):
     """
     SAFELY update ONLY summary and skills sections.
-    PRESERVES experience and education sections.
+    PRESERVES experience and education sections completely.
     """
     doc = Document(template_path)
     
-    # Find exact positions of section headers
+    # Find exact positions of ALL section headers
     summary_pos = -1
     skills_pos = -1
     experience_pos = -1
     education_pos = -1
     
+    print("\n🔍 Scanning document for headers:")
     for i, para in enumerate(doc.paragraphs):
         text = para.text.lower().strip()
+        print(f"  {i}: {text[:50]}...")
         
         if 'summary' in text and len(text) < 30:
             summary_pos = i
@@ -188,26 +190,21 @@ def update_docx_sections(template_path, new_summary, new_skills):
             education_pos = i
             print(f"📍 Found EDUCATION at position {i}")
     
-    print(f"📍 Positions: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}, Education={education_pos}")
+    print(f"\n📌 Final positions:")
+    print(f"  Summary: {summary_pos}")
+    print(f"  Skills: {skills_pos}")
+    print(f"  Experience: {experience_pos}")
+    print(f"  Education: {education_pos}")
     
-    # --- UPDATE SUMMARY (SAFELY) ---
+    # --- UPDATE SUMMARY ---
     if summary_pos != -1 and new_summary:
-        print(f"📝 Updating summary at position {summary_pos}")
+        print(f"\n📝 Updating summary at position {summary_pos}")
         
-        # Find end of summary (BEFORE skills or experience)
-        end_pos = len(doc.paragraphs)
-        if skills_pos != -1 and skills_pos > summary_pos:
-            end_pos = skills_pos
-        elif experience_pos != -1 and experience_pos > summary_pos:
-            end_pos = experience_pos
-        
+        # Summary ends BEFORE skills
+        end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         print(f"  Summary range: {summary_pos+1} to {end_pos-1}")
         
-        # Count how many paragraphs to clear
-        clear_count = end_pos - summary_pos - 1
-        print(f"  Clearing {clear_count} paragraphs")
-        
-        # Clear content between summary header and next header
+        # Clear content between summary header and skills header
         for i in range(summary_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -229,24 +226,15 @@ def update_docx_sections(template_path, new_summary, new_skills):
                 para.text = new_summary
             print(f"✅ Updated summary")
     
-    # --- UPDATE SKILLS (SAFELY) ---
+    # --- UPDATE SKILLS ---
     if skills_pos != -1 and new_skills:
-        print(f"📝 Updating skills at position {skills_pos}")
+        print(f"\n📝 Updating skills at position {skills_pos}")
         
-        # Find end of skills (BEFORE experience)
-        end_pos = len(doc.paragraphs)
-        if experience_pos != -1 and experience_pos > skills_pos:
-            end_pos = experience_pos
-        elif education_pos != -1 and education_pos > skills_pos:
-            end_pos = education_pos
-        
+        # Skills ends BEFORE experience
+        end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
         print(f"  Skills range: {skills_pos+1} to {end_pos-1}")
         
-        # Count how many paragraphs to clear
-        clear_count = end_pos - skills_pos - 1
-        print(f"  Clearing {clear_count} paragraphs")
-        
-        # Clear content between skills header and next header
+        # Clear content between skills header and experience header
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -261,24 +249,15 @@ def update_docx_sections(template_path, new_summary, new_skills):
         skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
         print(f"  Inserting {len(skills_lines)} skill lines")
         
-        # Only insert up to the available paragraphs
-        max_lines = min(len(skills_lines), end_pos - skills_pos - 1)
-        
-        for i in range(max_lines):
-            if skills_pos + 1 + i < len(doc.paragraphs):
+        for i, line in enumerate(skills_lines):
+            if skills_pos + 1 + i < end_pos and skills_pos + 1 + i < len(doc.paragraphs):
                 para = doc.paragraphs[skills_pos + 1 + i]
                 if para.runs:
-                    para.runs[0].text = skills_lines[i]
+                    para.runs[0].text = line
                     for run in para.runs[1:]:
                         run.text = ""
                 else:
-                    para.text = skills_lines[i]
-        
-        # If we have more skills than paragraphs, add them
-        if len(skills_lines) > max_lines:
-            for i in range(max_lines, len(skills_lines)):
-                doc.paragraphs[skills_pos + 1 + i].text = skills_lines[i]
-        
+                    para.text = line
         print(f"✅ Updated skills with {len(skills_lines)} lines")
     
     output = BytesIO()
