@@ -24,7 +24,6 @@ CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
 def call_deepseek(prompt):
-"""Call DeepSeek API and return parsed JSON."""
 response = client.chat.completions.create(
 model="deepseek-chat",
 messages=[
@@ -46,18 +45,12 @@ return json.loads(response.choices[0].message.content)
 ```
 
 def read_docx(file_path):
-"""Extract text from a DOCX file."""
 doc = Document(file_path)
 paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
 return "\n".join(paragraphs)
 
 def tailor_cv_deep(cv_text, job_description):
-"""Tailor summary, skills, and experience."""
-
-```
 prompt = f"""
-```
-
 You are a professional CV tailoring expert.
 
 MASTER CV:
@@ -97,12 +90,7 @@ return call_deepseek(prompt)
 ```
 
 def tailor_cover_letter_deep(cover_text, cv_text, job_description):
-"""Generate a tailored cover letter."""
-
-```
 prompt = f"""
-```
-
 You are a professional cover letter writer.
 
 JOB DESCRIPTION:
@@ -135,24 +123,18 @@ return response.choices[0].message.content
 ```
 
 def update_summary(doc, new_summary):
-"""Update the Summary section."""
-
-```
 for i, para in enumerate(doc.paragraphs):
-    if para.text.strip().lower() == "summary":
-        if i + 1 < len(doc.paragraphs):
-            doc.paragraphs[i + 1].text = new_summary
-        break
-```
+if para.text.strip().lower() == "summary":
+if i + 1 < len(doc.paragraphs):
+doc.paragraphs[i + 1].text = new_summary
+break
 
 def update_skills(doc, new_skills):
-"""Update the Skills section."""
+for i, para in enumerate(doc.paragraphs):
+if "skill" in para.text.strip().lower():
+j = i + 1
 
 ```
-for i, para in enumerate(doc.paragraphs):
-    if "skill" in para.text.strip().lower():
-        j = i + 1
-
         while j < len(doc.paragraphs):
             text = doc.paragraphs[j].text.strip().lower()
             if "experience" in text:
@@ -169,12 +151,10 @@ for i, para in enumerate(doc.paragraphs):
 ```
 
 def update_experience(doc, tailored_experience):
-"""Update experience bullet points while preserving job titles and dates."""
+for i, para in enumerate(doc.paragraphs):
+job_title = para.text.strip()
 
 ```
-for i, para in enumerate(doc.paragraphs):
-    job_title = para.text.strip()
-
     if job_title in tailored_experience:
         new_bullets = tailored_experience[job_title]
 
@@ -200,12 +180,10 @@ for i, para in enumerate(doc.paragraphs):
 ```
 
 def process_application(job_description):
-"""Process CV and cover letter tailoring."""
-
-```
 cv_text = read_docx(CV_PATH)
 cover_text = read_docx(COVER_PATH)
 
+```
 result = tailor_cv_deep(cv_text, job_description)
 
 tailored_summary = result.get("tailored_summary", "")
