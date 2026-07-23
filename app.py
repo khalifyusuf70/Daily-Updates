@@ -17,11 +17,6 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
     print("⚠️ DEEPSEEK_API_KEY not set")
-    # For testing, you can set a default
-    # DEEPSEEK_API_KEY = "your-key-here"
-
-print(f"🔑 API Key present: {bool(DEEPSEEK_API_KEY)}")
-print(f"🔑 API Key first 10 chars: {DEEPSEEK_API_KEY[:10] if DEEPSEEK_API_KEY else 'None'}...")
 
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
@@ -33,33 +28,19 @@ COVER_PATH = "Cover_Template.docx"
 
 def call_deepseek(prompt):
     """Call DeepSeek API with proper format"""
-    print("\n" + "="*50)
-    print("📞 CALLING DEEPSEEK API")
-    print("="*50)
-    print(f"📝 Prompt length: {len(prompt)} characters")
-    
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "You are an expert CV tailoring assistant. Return ONLY valid JSON. Do not add any explanation, just the JSON."},
+                {"role": "system", "content": "You are an expert CV tailoring assistant. Return ONLY valid JSON."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.4,
             response_format={"type": "json_object"}
         )
-        
-        result_text = response.choices[0].message.content
-        print(f"✅ API Response: {result_text[:200]}...")
-        
-        result = json.loads(result_text)
-        print(f"✅ Parsed JSON keys: {result.keys()}")
-        return result
-        
+        return json.loads(response.choices[0].message.content)
     except Exception as e:
-        print(f"❌ DeepSeek API error: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"DeepSeek API error: {str(e)}")
         raise e
 
 def read_docx(file_path):
@@ -75,12 +56,13 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
+def get_docx_paragraphs(file_path):
+    """Get all paragraphs from DOCX with their indices"""
+    doc = Document(file_path)
+    return [(i, para) for i, para in enumerate(doc.paragraphs)]
+
 def tailor_cv_deep(cv_text, job_description):
     """Deep tailoring of CV to match job description"""
-    
-    print("\n" + "="*50)
-    print("🔍 EXTRACTING SECTIONS FROM CV")
-    print("="*50)
     
     # Extract current summary and skills
     lines = cv_text.split('\n')
@@ -89,102 +71,71 @@ def tailor_cv_deep(cv_text, job_description):
     in_summary = False
     in_skills = False
     
-    for i, line in enumerate(lines):
+    for line in lines:
         line_lower = line.lower().strip()
         
-        # Detect sections
-        if 'summary' in line_lower and '#' in line:
+        # Detect sections by text content (not #)
+        if 'summary' in line_lower and len(line) < 50:
             in_summary = True
             in_skills = False
-            print(f"📍 Found SUMMARY at line {i}")
             continue
-        elif 'skill' in line_lower and '#' in line:
+        elif 'skill' in line_lower and len(line) < 50:
             in_summary = False
             in_skills = True
-            print(f"📍 Found SKILLS at line {i}")
             continue
-        elif 'experience' in line_lower and '#' in line:
+        elif 'experience' in line_lower and len(line) < 50:
             in_summary = False
             in_skills = False
-            print(f"📍 Found EXPERIENCE at line {i} - stopping")
             continue
-        elif 'education' in line_lower and '#' in line:
+        elif 'education' in line_lower and len(line) < 50:
             in_summary = False
             in_skills = False
             continue
         
         # Collect content
-        if in_summary and line.strip() and not line.startswith('#'):
+        if in_summary and line.strip():
             clean = re.sub(r'\{#.*?\}', '', line)
             clean = re.sub(r'\.Styl\d+', '', clean)
-            if clean.strip():
+            if clean.strip() and not clean.startswith('#'):
                 current_summary += clean.strip() + " "
-                print(f"  📝 Summary line: {clean[:50]}...")
-        elif in_skills and line.strip() and not line.startswith('#'):
+        elif in_skills and line.strip():
             clean = re.sub(r'\{#.*?\}', '', line)
             clean = re.sub(r'\.Styl\d+', '', clean)
-            if clean.strip() and not clean.startswith('+'):
+            if clean.strip() and not clean.startswith('#') and not clean.startswith('+'):
                 current_skills += clean.strip() + "\n"
-                print(f"  📝 Skills line: {clean[:50]}...")
-    
-    print(f"\n📝 FINAL EXTRACTED SUMMARY: {current_summary[:100]}...")
-    print(f"📝 FINAL EXTRACTED SKILLS: {current_skills[:100]}...")
     
     if not current_summary:
-        print("⚠️ No summary found! Using default.")
         current_summary = "Senior professional with 10+ years of experience in government and international development."
     if not current_skills:
-        print("⚠️ No skills found! Using default.")
         current_skills = "Resource Mobilization, Grants Management, Stakeholder Engagement, Strategic Leadership"
-    
-    # Check if we're actually going to call the API
-    print("\n" + "="*50)
-    print("🤖 PREPARING AI PROMPT")
-    print("="*50)
     
     prompt = f"""
 You are a professional CV tailor. Rewrite ONLY the SUMMARY and SKILLS sections.
 
-CURRENT SUMMARY (rewrite this):
+CURRENT SUMMARY:
 {current_summary}
 
-CURRENT SKILLS (rewrite this):
+CURRENT SKILLS:
 {current_skills}
 
 JOB DESCRIPTION:
 {job_description}
 
 INSTRUCTIONS:
-1. SUMMARY: Write 4-6 sentences that PERFECTLY match this job. Use keywords from the job description.
+1. SUMMARY: Write 4-6 sentences that PERFECTLY match this job.
 2. SKILLS: List 10-12 skills as a bulleted list matching this job.
 
-IMPORTANT: Return ONLY valid JSON with these exact keys:
+Return ONLY JSON:
 {{
-    "tailored_summary": "your new summary here",
+    "tailored_summary": "new summary here",
     "tailored_skills": "skill 1\\nskill 2\\nskill 3"
 }}
 """
     
-    print(f"📝 Prompt length: {len(prompt)} characters")
-    print(f"📝 Prompt first 200 chars: {prompt[:200]}...")
-    
-    result = call_deepseek(prompt)
-    
-    print("\n" + "="*50)
-    print("📊 AI RESPONSE")
-    print("="*50)
-    print(f"✅ Result keys: {result.keys()}")
-    print(f"📝 New Summary: {result.get('tailored_summary', '')[:100]}...")
-    print(f"📝 New Skills: {result.get('tailored_skills', '')[:100]}...")
-    
-    return result
+    return call_deepseek(prompt)
 
 def tailor_cover_letter_deep(cover_text, cv_text, job_description):
     """Generate deeply tailored cover letter"""
-    
-    print("\n" + "="*50)
-    print("✍️ GENERATING COVER LETTER")
-    print("="*50)
     
     prompt = f"""
 You are a professional cover letter writer.
@@ -208,56 +159,53 @@ Return ONLY the cover letter text.
             ],
             temperature=0.4
         )
-        result = response.choices[0].message.content
-        print(f"✅ Cover letter generated: {len(result)} characters")
-        return result
+        return response.choices[0].message.content
     except Exception as e:
-        print(f"❌ Cover letter error: {str(e)}")
+        print(f"Cover letter error: {str(e)}")
         return cover_text
 
 def update_docx_sections(template_path, new_summary, new_skills):
-    """Update ONLY summary and skills sections in the DOCX"""
-    
-    print("\n" + "="*50)
-    print("📄 UPDATING DOCX SECTIONS")
-    print("="*50)
-    print(f"📝 New Summary: {new_summary[:100]}...")
-    print(f"📝 New Skills: {new_skills[:100]}...")
-    
+    """
+    Update ONLY summary and skills sections.
+    Uses actual paragraph text without # symbols.
+    """
     doc = Document(template_path)
     
-    # Find the exact positions of section headers
+    # Find the exact positions of section headers (looking at the actual text)
     summary_pos = -1
     skills_pos = -1
     experience_pos = -1
+    education_pos = -1
     
     for i, para in enumerate(doc.paragraphs):
         text = para.text.lower().strip()
-        if 'summary' in text and '#' in para.text:
+        
+        # Look for section headers in the actual text
+        if 'summary' in text and len(text) < 30:
             summary_pos = i
-            print(f"📍 Found SUMMARY at position {i}")
-        elif 'skill' in text and '#' in para.text:
+            print(f"📍 Found SUMMARY at position {i}: '{para.text}'")
+        elif 'skill' in text and len(text) < 30:
             skills_pos = i
-            print(f"📍 Found SKILLS at position {i}")
-        elif 'experience' in text and '#' in para.text:
+            print(f"📍 Found SKILLS at position {i}: '{para.text}'")
+        elif 'experience' in text and len(text) < 30:
             experience_pos = i
-            print(f"📍 Found EXPERIENCE at position {i}")
-            break
+            print(f"📍 Found EXPERIENCE at position {i}: '{para.text}'")
+            break  # Stop after experience
     
-    print(f"📍 Summary at: {summary_pos}, Skills at: {skills_pos}, Experience at: {experience_pos}")
+    print(f"📍 Positions - Summary: {summary_pos}, Skills: {skills_pos}, Experience: {experience_pos}")
     
     # --- UPDATE SUMMARY ---
     if summary_pos != -1 and new_summary:
-        print("\n📝 Updating Summary...")
+        print(f"📝 Updating summary at position {summary_pos}")
+        
+        # Find end of summary (before skills or experience)
         end_pos = len(doc.paragraphs)
         if skills_pos != -1 and skills_pos > summary_pos:
             end_pos = skills_pos
         elif experience_pos != -1 and experience_pos > summary_pos:
             end_pos = experience_pos
         
-        print(f"  Summary range: {summary_pos+1} to {end_pos-1}")
-        
-        # Clear all content between summary header and next header
+        # Clear content between summary header and next header
         for i in range(summary_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -278,21 +226,19 @@ def update_docx_sections(template_path, new_summary, new_skills):
             else:
                 para.text = new_summary
             print(f"✅ Updated summary")
-        else:
-            print(f"❌ Cannot insert summary at position {summary_pos + 1}")
-    else:
-        print(f"❌ Summary not found or empty")
     
     # --- UPDATE SKILLS ---
     if skills_pos != -1 and new_skills:
-        print("\n📝 Updating Skills...")
+        print(f"📝 Updating skills at position {skills_pos}")
+        
+        # Find end of skills (before experience)
         end_pos = len(doc.paragraphs)
         if experience_pos != -1 and experience_pos > skills_pos:
             end_pos = experience_pos
+        elif education_pos != -1 and education_pos > skills_pos:
+            end_pos = education_pos
         
-        print(f"  Skills range: {skills_pos+1} to {end_pos-1}")
-        
-        # Clear all content between skills header and experience header
+        # Clear content between skills header and next header
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 para = doc.paragraphs[i]
@@ -305,7 +251,6 @@ def update_docx_sections(template_path, new_summary, new_skills):
         
         # Insert new skills
         skills_lines = [p.strip() for p in new_skills.split('\n') if p.strip()]
-        print(f"  Skills lines to insert: {len(skills_lines)}")
         
         for i, line in enumerate(skills_lines):
             if skills_pos + 1 + i < len(doc.paragraphs):
@@ -317,8 +262,6 @@ def update_docx_sections(template_path, new_summary, new_skills):
                 else:
                     para.text = line
         print(f"✅ Updated skills with {len(skills_lines)} lines")
-    else:
-        print(f"❌ Skills not found or empty")
     
     output = BytesIO()
     doc.save(output)
@@ -328,18 +271,11 @@ def update_docx_sections(template_path, new_summary, new_skills):
 def process_application(job_description):
     """Process the entire application tailoring"""
     
-    print("\n" + "="*50)
-    print("🚀 STARTING PROCESS APPLICATION")
-    print("="*50)
-    
     if not os.path.exists(CV_PATH):
         return None, None, f"CV file not found: {CV_PATH}"
     
     if not os.path.exists(COVER_PATH):
         return None, None, f"Cover letter template not found: {COVER_PATH}"
-    
-    print(f"📂 CV exists: {CV_PATH}")
-    print(f"📂 Cover exists: {COVER_PATH}")
     
     cv_text = read_docx(CV_PATH)
     cover_text = read_docx(COVER_PATH)
@@ -347,37 +283,28 @@ def process_application(job_description):
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
     
-    print(f"📄 CV text length: {len(cv_text)} characters")
-    print(f"📄 Cover text length: {len(cover_text)} characters")
-    
     try:
+        print("🤖 Tailoring CV...")
         result = tailor_cv_deep(cv_text, job_description)
         
         tailored_summary = result.get('tailored_summary', '')
         tailored_skills = result.get('tailored_skills', '')
         
-        print(f"\n📝 FINAL NEW SUMMARY: {tailored_summary[:200]}...")
-        print(f"📝 FINAL NEW SKILLS: {tailored_skills[:200]}...")
+        print(f"📝 New Summary: {tailored_summary[:100]}...")
+        print(f"📝 New Skills: {tailored_skills[:100]}...")
         
-        if not tailored_summary:
-            print("❌ ERROR: AI returned empty summary!")
-            return None, None, "AI returned empty summary"
-            
     except Exception as e:
-        print(f"❌ CV tailoring failed: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return None, None, f"CV tailoring failed: {str(e)}"
     
     try:
-        print("\n✍️ Generating cover letter...")
+        print("✍️ Generating cover letter...")
         tailored_cover = tailor_cover_letter_deep(cover_text, cv_text, job_description)
     except Exception as e:
         tailored_cover = cover_text
         print(f"⚠️ Cover letter failed: {str(e)}")
     
     try:
-        print("\n📄 Generating tailored CV...")
+        print("📄 Generating tailored CV...")
         cv_output = update_docx_sections(CV_PATH, tailored_summary, tailored_skills)
         
         # Generate cover letter
@@ -396,14 +323,11 @@ def process_application(job_description):
         cover_output = BytesIO()
         cover_doc.save(cover_output)
         cover_output.seek(0)
-        print("✅ Documents generated successfully")
+        print("✅ Documents generated")
         
         return cv_output, cover_output, "Success"
         
     except Exception as e:
-        print(f"❌ Document generation error: {str(e)}")
-        import traceback
-        traceback.print_exc()
         return None, None, f"Document generation error: {str(e)}"
 
 @app.route('/')
@@ -421,8 +345,7 @@ def tailor():
         if not job_description:
             return jsonify({'error': 'Please paste a job description'}), 400
         
-        print(f"\n📝 Processing job: {len(job_description)} characters")
-        print(f"📝 Job description first 200 chars: {job_description[:200]}...")
+        print(f"📝 Processing job: {len(job_description)} characters")
         
         cv_output, cover_output, message = process_application(job_description)
         
