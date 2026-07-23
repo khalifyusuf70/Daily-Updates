@@ -1,10 +1,9 @@
-# Complete app.py (replace your existing file)
+# app.py (copy this entire file exactly)
 
 ```python
 import os
 import json
 import base64
-import re
 from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, jsonify
@@ -14,12 +13,8 @@ from openai import OpenAI
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
-# ---------------------------
-# DEEPSEEK API CONFIGURATION
-# ---------------------------
+# DeepSeek API Configuration
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
-if not DEEPSEEK_API_KEY:
-    print("⚠️ DEEPSEEK_API_KEY not set")
 
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
@@ -29,9 +24,6 @@ client = OpenAI(
 CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
-# ---------------------------
-# DEEPSEEK CALL
-# ---------------------------
 def call_deepseek(prompt):
     """Call DeepSeek API and return JSON"""
     response = client.chat.completions.create(
@@ -43,20 +35,15 @@ def call_deepseek(prompt):
         temperature=0.4,
         response_format={"type": "json_object"}
     )
+
     return json.loads(response.choices[0].message.content)
 
-# ---------------------------
-# READ DOCX
-# ---------------------------
 def read_docx(file_path):
     """Extract text from a .docx file"""
     doc = Document(file_path)
     paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
     return "\n".join(paragraphs)
 
-# ---------------------------
-# TAILOR CV INCLUDING EXPERIENCE
-# ---------------------------
 def tailor_cv_deep(cv_text, job_description):
     """Tailor summary, skills, and experience"""
 
@@ -89,9 +76,6 @@ Return JSON in this exact structure:
         "Chief of Staff (Feb 2023-To Date)": [
             "Rewritten bullet 1",
             "Rewritten bullet 2"
-        ],
-        "Senior Advisor – Projects Planning & Grants Development | Aug 2021 – Jan 2023": [
-            "Rewritten bullet 1"
         ]
     }}
 }}
@@ -99,9 +83,6 @@ Return JSON in this exact structure:
 
     return call_deepseek(prompt)
 
-# ---------------------------
-# TAILOR COVER LETTER
-# ---------------------------
 def tailor_cover_letter_deep(cover_text, cv_text, job_description):
     """Generate tailored cover letter"""
 
@@ -129,26 +110,16 @@ Return ONLY the cover letter text.
 
     return response.choices[0].message.content
 
-# ---------------------------
-# UPDATE SUMMARY
-# ---------------------------
 def update_summary(doc, new_summary):
+    """Update summary section"""
     for i, para in enumerate(doc.paragraphs):
         if para.text.strip().lower() == "summary":
             if i + 1 < len(doc.paragraphs):
-                p = doc.paragraphs[i + 1]
-                if p.runs:
-                    p.runs[0].text = new_summary
-                    for run in p.runs[1:]:
-                        run.text = ""
-                else:
-                    p.text = new_summary
+                doc.paragraphs[i + 1].text = new_summary
             break
 
-# ---------------------------
-# UPDATE SKILLS
-# ---------------------------
 def update_skills(doc, new_skills):
+    """Update skills section"""
     for i, para in enumerate(doc.paragraphs):
         if "skill" in para.text.strip().lower():
             j = i + 1
@@ -167,9 +138,6 @@ def update_skills(doc, new_skills):
                     doc.paragraphs[i + 1 + idx].text = f"• {skill}"
             break
 
-# ---------------------------
-# UPDATE EXPERIENCE
-# ---------------------------
 def update_experience(doc, tailored_experience):
     """Update experience bullets while preserving job titles and dates"""
 
@@ -179,15 +147,14 @@ def update_experience(doc, tailored_experience):
         if job_title in tailored_experience:
             new_bullets = tailored_experience[job_title]
 
-            # Find the employer line (usually next paragraph)
+            # Find employer line
             employer_index = i + 1
 
-            # Find the next section/job title
+            # Find next job title or Education section
             j = employer_index + 1
             while j < len(doc.paragraphs):
                 text = doc.paragraphs[j].text.strip()
 
-                # Stop at Education or another job title
                 if text in tailored_experience.keys() or text.lower() == "education":
                     break
                 j += 1
@@ -202,15 +169,8 @@ def update_experience(doc, tailored_experience):
                 if target_index < len(doc.paragraphs):
                     doc.paragraphs[target_index].text = f"• {bullet}"
 
-# ---------------------------
-# PROCESS APPLICATION
-# ---------------------------
 def process_application(job_description):
-    if not os.path.exists(CV_PATH):
-        return None, None, f"CV file not found: {CV_PATH}"
-
-    if not os.path.exists(COVER_PATH):
-        return None, None, f"Cover letter template not found: {COVER_PATH}"
+    """Process CV and cover letter tailoring"""
 
     cv_text = read_docx(CV_PATH)
     cover_text = read_docx(COVER_PATH)
@@ -235,55 +195,42 @@ def process_application(job_description):
     tailored_cover = tailor_cover_letter_deep(cover_text, cv_text, job_description)
 
     cover_doc = Document(COVER_PATH)
-    paragraphs = [p for p in tailored_cover.split("\n") if p.strip()]
-
-    for i, para in enumerate(cover_doc.paragraphs):
-        if i < len(paragraphs):
-            para.text = paragraphs[i]
+    cover_doc.paragraphs[0].text = tailored_cover
 
     cover_output = BytesIO()
     cover_doc.save(cover_output)
     cover_output.seek(0)
 
-    return cv_output, cover_output, "Success"
+    return cv_output, cover_output
 
-# ---------------------------
-# ROUTES
-# ---------------------------
-@app.route('/')
+@app.route("/")
 def index():
-    return render_template('index.html')
+    return render_template("index.html")
 
-@app.route('/tailor', methods=['POST'])
+@app.route("/tailor", methods=["POST"])
 def tailor():
-    job_description = request.form.get('job_description', '').strip()
+    job_description = request.form.get("job_description", "").strip()
 
     if not job_description:
-        return jsonify({'error': 'Please paste a job description'}), 400
+        return jsonify({"error": "Please paste a job description"}), 400
 
-    cv_output, cover_output, message = process_application(job_description)
+    cv_output, cover_output = process_application(job_description)
 
-    if cv_output and cover_output:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-        return jsonify({
-            'success': True,
-            'cv_filename': f'Tailored_CV_{timestamp}.docx',
-            'cover_filename': f'Tailored_Cover_{timestamp}.docx',
-            'cv_data': base64.b64encode(cv_output.getvalue()).decode('utf-8'),
-            'cover_data': base64.b64encode(cover_output.getvalue()).decode('utf-8')
-        })
+    return jsonify({
+        "success": True,
+        "cv_filename": f"Tailored_CV_{timestamp}.docx",
+        "cover_filename": f"Tailored_Cover_{timestamp}.docx",
+        "cv_data": base64.b64encode(cv_output.getvalue()).decode("utf-8"),
+        "cover_data": base64.b64encode(cover_output.getvalue()).decode("utf-8")
+    })
 
-    return jsonify({'error': message}), 500
-
-@app.route('/health')
+@app.route("/health")
 def health():
-    return jsonify({'status': 'healthy'})
+    return jsonify({"status": "healthy"})
 
-# ---------------------------
-# RUN APP
-# ---------------------------
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host="0.0.0.0", port=port)
 ```
