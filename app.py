@@ -27,9 +27,10 @@ CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
 def call_deepseek(prompt):
+    """Call DeepSeek API with proper format"""
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",  # UPDATED MODEL NAME
             messages=[
                 {"role": "system", "content": "You are an expert CV tailoring assistant. Return ONLY valid JSON."},
                 {"role": "user", "content": prompt}
@@ -111,7 +112,7 @@ Return ONLY the cover letter text.
 """
     try:
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-pro",  # UPDATED MODEL NAME
             messages=[
                 {"role": "system", "content": "You are an expert cover letter writer. Return only the cover letter text."},
                 {"role": "user", "content": prompt}
@@ -223,9 +224,6 @@ def update_experience(doc, tailored_experience):
 
         print(f"  ✅ Updating: {matched_key[:50]}...")
 
-        # We need to preserve the employer line (the line right after job title if it has company name)
-        # and any lines that are not bullet points.
-
         # Collect all paragraph indices that are bullet points within this section
         bullet_indices = []
         for i in range(pos + 1, end_pos):
@@ -233,14 +231,11 @@ def update_experience(doc, tailored_experience):
             text = para.text.strip()
             if text.startswith('-') or text.startswith('•') or text.startswith('*'):
                 bullet_indices.append(i)
-            # If it's a non-empty line that is not a bullet and not the employer, we keep it (like employer line)
 
         # Replace bullet points in order
-        # We'll clear each bullet and set new text
         for idx, bullet_text in zip(bullet_indices, new_bullets):
             if idx < len(doc.paragraphs):
                 para = doc.paragraphs[idx]
-                # Preserve the bullet symbol style (if any)
                 if para.runs:
                     para.runs[0].text = f"• {bullet_text}"
                     for run in para.runs[1:]:
