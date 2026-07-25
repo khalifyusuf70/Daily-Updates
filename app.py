@@ -44,7 +44,7 @@ def call_deepseek(prompt):
         raise e
 
 def read_docx(file_path):
-    """Extract text and preserve structure"""
+    """Extract text from .docx file"""
     try:
         doc = Document(file_path)
         paragraphs = []
@@ -55,15 +55,6 @@ def read_docx(file_path):
     except Exception as e:
         print(f"Error reading {file_path}: {str(e)}")
         return ""
-
-def get_docx_structure(file_path):
-    """Get full document with paragraph indices for debugging"""
-    doc = Document(file_path)
-    result = []
-    for i, para in enumerate(doc.paragraphs):
-        if para.text.strip():
-            result.append((i, para.text))
-    return result, doc
 
 def tailor_cv_deep(cv_text, job_description):
     """Rewrite Summary, Skills, and Experience bullets"""
@@ -82,7 +73,7 @@ Rewrite the CV to align with the job description, while being 100% truthful.
 
 RULES:
 1. Rewrite the professional summary (4-6 sentences).
-2. Rewrite the skills section as a comma-separated list.
+2. Rewrite the skills section as a comma-separated list of 10-12 skills.
 3. For EACH job, rewrite the bullet points to highlight relevant achievements.
 4. Do NOT invent new jobs, achievements, or numbers.
 5. Keep job titles, employers, and dates exactly as they appear.
@@ -99,6 +90,10 @@ Return JSON:
             "bullet 3"
         ],
         "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
+            "bullet 1",
+            "bullet 2"
+        ],
+        "Chief Operations Officer | Jul 2016 -- Jul 2021": [
             "bullet 1",
             "bullet 2"
         ]
@@ -136,39 +131,35 @@ Return ONLY the cover letter text.
 
 def update_docx_sections(template_path, new_summary, new_skills, new_experience):
     """
-    Update only summary, skills, and experience bullet points.
-    Preserves job titles and formatting.
+    Update summary, skills, and experience using direct text replacement
     """
     doc = Document(template_path)
     
-    # Find all section positions
+    # Find section positions
     summary_pos = -1
     skills_pos = -1
     experience_pos = -1
-    education_pos = -1
     
-    print("\n🔍 Scanning document headers:")
+    print("\n🔍 Finding sections:")
     for i, para in enumerate(doc.paragraphs):
         text = para.text.lower().strip()
         if 'summary' in text and len(text) < 30:
             summary_pos = i
-            print(f"  Summary at {i}: '{para.text[:30]}'")
+            print(f"  Summary at {i}")
         elif 'skill' in text and len(text) < 30:
             skills_pos = i
-            print(f"  Skills at {i}: '{para.text[:30]}'")
+            print(f"  Skills at {i}")
         elif 'experience' in text and len(text) < 30:
             experience_pos = i
-            print(f"  Experience at {i}: '{para.text[:30]}'")
-        elif 'education' in text and len(text) < 30:
-            education_pos = i
-            print(f"  Education at {i}: '{para.text[:30]}'")
+            print(f"  Experience at {i}")
+            break
     
     # 1. UPDATE SUMMARY
     if summary_pos != -1 and new_summary:
-        print(f"\n📝 Updating summary at position {summary_pos}")
+        print(f"\n📝 Updating summary...")
         end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         
-        # Clear existing summary content (keep header)
+        # Clear existing content
         for i in range(summary_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
@@ -178,12 +169,12 @@ def update_docx_sections(template_path, new_summary, new_skills, new_experience)
             doc.paragraphs[summary_pos + 1].text = new_summary
             print(f"✅ Summary updated")
     
-    # 2. UPDATE SKILLS - Complete rebuild
+    # 2. UPDATE SKILLS
     if skills_pos != -1 and new_skills:
-        print(f"\n📝 Updating skills at position {skills_pos}")
+        print(f"\n📝 Updating skills...")
         end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
         
-        # Remove entire skills section content (keep header)
+        # Clear existing content
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
@@ -195,69 +186,82 @@ def update_docx_sections(template_path, new_summary, new_skills, new_experience)
                 doc.paragraphs[skills_pos + 1 + i].text = f"• {skill}"
         print(f"✅ Skills updated with {len(skills_list)} skills")
     
-    # 3. UPDATE EXPERIENCE BULLETS
+    # 3. UPDATE EXPERIENCE - New approach: find each job by its exact title
     if experience_pos != -1 and new_experience:
-        print(f"\n📝 Updating experience bullets")
+        print(f"\n📝 Updating experience...")
         
-        # Find all job titles in the document
-        job_titles = []
-        for i, para in enumerate(doc.paragraphs):
-            text = para.text.strip()
-            # Detect job titles (bold with dates in parentheses)
-            if '(' in text and ')' in text and any(y in text for y in ['2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016']):
-                # Check if it's a job title (not just any text with a date)
-                if any(keyword in text.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager', 'director', 'coordinator']):
-                    job_titles.append((i, text))
-                    print(f"  Found job: '{text[:50]}...'")
+        # Create a list of all paragraph texts with their indices
+        paragraphs = [(i, para.text.strip()) for i, para in enumerate(doc.paragraphs)]
         
-        # Process each job
-        for pos, title in job_titles:
-            # Find matching key in new_experience
-            matched_key = None
-            for key in new_experience.keys():
-                # Check if title contains key or key contains title (fuzzy match)
-                if key.lower() in title.lower() or title.lower() in key.lower():
-                    matched_key = key
+        # Find each job section
+        for job_title, new_bullets in new_experience.items():
+            print(f"  Looking for: {job_title[:40]}...")
+            
+            # Find the paragraph containing this job title
+            job_idx = -1
+            for i, text in paragraphs:
+                if job_title in text:
+                    job_idx = i
                     break
             
-            if not matched_key:
-                print(f"  ⚠️ No match for: '{title[:40]}'")
+            if job_idx == -1:
+                print(f"    ⚠️ Job not found: {job_title[:40]}")
                 continue
             
-            new_bullets = new_experience[matched_key]
-            if not new_bullets:
-                continue
+            print(f"    ✅ Found at index {job_idx}")
             
-            print(f"  ✅ Updating: '{matched_key[:40]}...' with {len(new_bullets)} bullets")
+            # Find the end of this job section (next job or Education)
+            end_idx = len(doc.paragraphs)
+            for next_job in new_experience.keys():
+                if next_job == job_title:
+                    continue
+                for i, text in paragraphs:
+                    if i > job_idx and next_job in text:
+                        if i < end_idx:
+                            end_idx = i
+                        break
             
-            # Find the end of this job section
-            end_pos = len(doc.paragraphs)
-            for next_pos, _ in job_titles:
-                if next_pos > pos:
-                    end_pos = next_pos
-                    break
+            # Also stop at Education
+            for i, text in paragraphs:
+                if i > job_idx and 'education' in text.lower():
+                    if i < end_idx:
+                        end_idx = i
+                        break
             
-            # Find bullet points in this section
+            print(f"    Section: {job_idx+1} to {end_idx-1}")
+            
+            # Now find all bullet points in this section
             bullet_indices = []
-            for i in range(pos + 1, end_pos):
-                text = doc.paragraphs[i].text.strip()
-                if text.startswith('-') or text.startswith('•'):
-                    bullet_indices.append(i)
+            for i in range(job_idx + 1, end_idx):
+                if i < len(doc.paragraphs):
+                    text = doc.paragraphs[i].text.strip()
+                    # Check if this is a bullet point (starts with dash, bullet, or is indented)
+                    if text.startswith('-') or text.startswith('•') or text.startswith('*') or (len(text) > 5 and text[0].isdigit() and text[1] == '.'):
+                        bullet_indices.append(i)
+                    # Also check if it's an employer line (company name)
+                    elif any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
+                        # This is the employer line - skip it
+                        continue
             
-            # Replace existing bullets
-            for i, bullet in enumerate(new_bullets):
+            print(f"    Found {len(bullet_indices)} bullet points")
+            
+            # Replace bullets
+            for i, bullet_text in enumerate(new_bullets):
                 if i < len(bullet_indices):
                     # Replace existing bullet
                     idx = bullet_indices[i]
-                    doc.paragraphs[idx].text = f"• {bullet}"
+                    if idx < len(doc.paragraphs):
+                        doc.paragraphs[idx].text = f"• {bullet_text}"
+                        print(f"      Replaced bullet {i+1}")
                 else:
                     # Add new bullet at the end of the section
-                    insert_pos = bullet_indices[-1] + 1 if bullet_indices else pos + 1
+                    insert_pos = bullet_indices[-1] + 1 if bullet_indices else job_idx + 2
                     if insert_pos < len(doc.paragraphs):
-                        doc.paragraphs[insert_pos].text = f"• {bullet}"
+                        doc.paragraphs[insert_pos].text = f"• {bullet_text}"
                         bullet_indices.append(insert_pos)
+                        print(f"      Added bullet {i+1}")
             
-            print(f"     Inserted {len(new_bullets)} bullets")
+            print(f"    ✅ Updated with {len(new_bullets)} bullets")
     
     # Save to BytesIO
     output = BytesIO()
