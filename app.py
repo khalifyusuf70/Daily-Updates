@@ -6,8 +6,6 @@ from datetime import datetime
 from io import BytesIO
 from flask import Flask, render_template, request, jsonify
 from docx import Document
-from docx.shared import Pt, RGBColor, Inches
-from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from openai import OpenAI
 
 app = Flask(__name__)
@@ -63,16 +61,16 @@ Return JSON in this format:
 {{
     "summary": "...",
     "experience": {{
-        "Chief of Staff (Feb 2023-To Date)": [
+        "Chief of Staff": [
             "...",
             "...",
             "..."
         ],
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
+        "Senior Advisor": [
             "...",
             "..."
         ],
-        "Chief Operations Officer | Jul 2016 -- Jul 2021": [
+        "Chief Operations Officer": [
             "...",
             "..."
         ]
@@ -84,12 +82,12 @@ def call_ai(cv_text, job_description):
     """Call DeepSeek API with the tailored prompts"""
     try:
         response = client.chat.completions.create(
-            model="deepseek-v4-pro",
+            model="deepseek-v4-pro",  # or "gpt-4o-mini" if using OpenAI
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(cv_text, job_description)},
             ],
-            temperature=0.2,
+            temperature=0.2,  # Low temperature = consistent, factual output
             response_format={"type": "json_object"}
         )
         return json.loads(response.choices[0].message.content)
@@ -122,7 +120,7 @@ def extract_job_titles(cv_text):
             if any(keyword in line.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager', 'director']):
                 clean = re.sub(r'\{#.*?\}', '', line)
                 clean = re.sub(r'\.Styl\d+', '', clean)
-                clean = re.sub(r'#', '', line)
+                clean = re.sub(r'#', '', clean)
                 if clean.strip():
                     job_titles.append(clean.strip())
     return job_titles
@@ -155,14 +153,10 @@ Return ONLY the cover letter text.
         print(f"Cover letter error: {str(e)}")
         return cover_text
 
-def create_tailored_docx(template_path, new_summary, new_experience):
+def update_docx_sections(template_path, new_summary, new_experience):
     """
-    Create tailored CV with ALL formatting requirements:
-    - Calibri Body 12 for all text
-    - Segoe UI 12 Bold for job titles
-    - Segoe UI 12 Italic for company names
-    - Skills in two-column table format
-    - Experience in correct order (most recent first)
+    Update summary and experience sections in DOCX
+    Preserves formatting and job titles
     """
     doc = Document(template_path)
     
@@ -183,105 +177,21 @@ def create_tailored_docx(template_path, new_summary, new_experience):
     
     print(f"\n📌 Found: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}")
     
-    # 1. UPDATE SUMMARY - Calibri Body 12
+    # 1. UPDATE SUMMARY
     if summary_pos != -1 and new_summary:
         end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         for i in range(summary_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
         if summary_pos + 1 < len(doc.paragraphs):
-            para = doc.paragraphs[summary_pos + 1]
-            para.text = new_summary
-            # Apply Calibri Body 12
-            for run in para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-        print(f"✅ Summary updated with Calibri 12")
+            doc.paragraphs[summary_pos + 1].text = new_summary
+        print(f"✅ Summary updated")
     
-    # 2. UPDATE SKILLS - Two-column table format
-    if skills_pos != -1:
-        print(f"\n📝 Rebuilding skills section...")
-        
-        # Define skills in two columns as requested
-        skills_left = [
-            "• Resource Mobilization & Grants Management",
-            "• Foundation Pipeline Management",
-            "• Due Diligence & Risk Assessment",
-            "• Impact Reporting & Communication",
-            "• Political & Contextual Analysis"
-        ]
-        skills_right = [
-            "• Team Leadership & Organizational Development",
-            "• Risk Management & Compliance",
-            "• Humanitarian Response Programming",
-            "• Strategic Planning & Organizational Dev."
-        ]
-        
-        # Find end of skills section
-        end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
-        
-        # Clear existing skills content
-        for i in range(skills_pos + 1, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        
-        # Create a table for skills (2 columns)
-        # Find the position to insert table
-        table_pos = skills_pos + 1
-        
-        # Remove any existing table at this position
-        for i in range(table_pos, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        
-        # Create new table with 2 columns
-        table = doc.add_table(rows=5, cols=2)
-        table.style = 'Table Grid'
-        table.autofit = False
-        
-        # Set column widths
-        table.columns[0].width = Inches(3.5)
-        table.columns[1].width = Inches(3.5)
-        
-        # Fill table with skills
-        for row_idx in range(5):
-            # Left column
-            left_cell = table.cell(row_idx, 0)
-            left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
-            left_para = left_cell.paragraphs[0]
-            for run in left_para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-            
-            # Right column
-            right_cell = table.cell(row_idx, 1)
-            right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
-            right_para = right_cell.paragraphs[0]
-            for run in right_para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-        
-        # Move table to correct position
-        # Get the table element and move it after the header
-        table_element = table._element
-        parent = doc.element.body
-        # Insert table after the skills header
-        parent.insert(summary_pos + 2, table_element)
-        
-        print(f"✅ Skills table created with Calibri 12")
-    
-    # 3. UPDATE EXPERIENCE - With proper formatting
+    # 2. UPDATE EXPERIENCE - Match job titles and replace bullets
     if experience_pos != -1 and new_experience:
-        print(f"\n📝 Updating experience with formatting...")
+        print(f"\n📝 Updating experience...")
         
-        # Get job titles in correct order (most recent first)
-        job_order = [
-            "Chief of Staff (Feb 2023-To Date)",
-            "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
-            "Chief Operations Officer | Jul 2016 -- Jul 2021"
-        ]
-        
-        # Find job positions in document
+        # Find all job positions in the document
         job_positions = []
         for i, para in enumerate(doc.paragraphs):
             text = para.text.strip()
@@ -289,12 +199,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 if any(keyword in text.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager']):
                     job_positions.append((i, text))
         
-        # Process each job in order
-        for job_title in job_order:
-            if job_title not in new_experience:
-                continue
-            
-            new_bullets = new_experience[job_title]
+        for job_title, new_bullets in new_experience.items():
             print(f"  Looking for: {job_title[:40]}...")
             
             # Find matching job
@@ -317,15 +222,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     end_idx = next_pos
                     break
             
-            # Find employer line (company name)
-            company_name = ""
-            for i in range(job_idx + 1, end_idx):
-                if i < len(doc.paragraphs):
-                    text = doc.paragraphs[i].text.strip()
-                    if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                        company_name = text
-                        break
-            
             # Find bullet points
             bullet_indices = []
             for i in range(job_idx + 1, end_idx):
@@ -334,47 +230,18 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     if text.startswith('-') or text.startswith('•') or text.startswith('*'):
                         bullet_indices.append(i)
             
-            # Clear existing bullets
-            for i in bullet_indices:
-                if i < len(doc.paragraphs):
-                    doc.paragraphs[i].text = ""
+            print(f"    Found {len(bullet_indices)} bullet points")
             
-            # Insert new bullets
+            # Replace bullets
             for i, bullet_text in enumerate(new_bullets):
-                insert_pos = job_idx + 2 + i  # After job title and company
-                if insert_pos < len(doc.paragraphs):
-                    para = doc.paragraphs[insert_pos]
-                    para.text = f"• {bullet_text}"
-                    for run in para.runs:
-                        run.font.name = 'Calibri'
-                        run.font.size = Pt(12)
+                if i < len(bullet_indices):
+                    idx = bullet_indices[i]
+                    doc.paragraphs[idx].text = f"• {bullet_text}"
                 else:
-                    # Add new paragraph
-                    para = doc.add_paragraph(f"• {bullet_text}")
-                    for run in para.runs:
-                        run.font.name = 'Calibri'
-                        run.font.size = Pt(12)
-            
-            # Apply formatting to job title (Segoe UI 12 Bold)
-            if job_idx < len(doc.paragraphs):
-                para = doc.paragraphs[job_idx]
-                for run in para.runs:
-                    run.font.name = 'Segoe UI'
-                    run.font.size = Pt(12)
-                    run.font.bold = True
-            
-            # Apply formatting to company name (Segoe UI 12 Italic)
-            if company_name:
-                for i in range(job_idx + 1, end_idx):
-                    if i < len(doc.paragraphs):
-                        text = doc.paragraphs[i].text.strip()
-                        if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                            para = doc.paragraphs[i]
-                            for run in para.runs:
-                                run.font.name = 'Segoe UI'
-                                run.font.size = Pt(12)
-                                run.font.italic = True
-                            break
+                    # Add new bullet at end
+                    insert_pos = bullet_indices[-1] + 1 if bullet_indices else job_idx + 2
+                    if insert_pos < len(doc.paragraphs) and insert_pos < end_idx:
+                        doc.paragraphs[insert_pos].text = f"• {bullet_text}"
             
             print(f"    ✅ Updated with {len(new_bullets)} bullets")
     
@@ -422,7 +289,7 @@ def process_application(job_description):
     
     try:
         print("📄 Generating tailored CV...")
-        cv_output = create_tailored_docx(CV_PATH, tailored_summary, tailored_experience)
+        cv_output = update_docx_sections(CV_PATH, tailored_summary, tailored_experience)
         
         # Cover letter
         cover_doc = Document(COVER_PATH)
