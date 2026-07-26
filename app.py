@@ -29,7 +29,7 @@ CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# STORED MASTER EXPERIENCES - YOU ONLY PASTE ONCE
+# STORED MASTER EXPERIENCES
 # ---------------------------
 MASTER_EXPERIENCE = {
     "Chief of Staff (Feb 2023-To Date)": {
@@ -61,7 +61,6 @@ MASTER_EXPERIENCE = {
     }
 }
 
-# Job order (most recent first)
 JOB_ORDER = [
     "Chief of Staff (Feb 2023-To Date)",
     "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
@@ -86,6 +85,15 @@ Rules:
 """
 
 def build_user_prompt(cv_text, job_description):
+    exact_titles = list(MASTER_EXPERIENCE.keys())
+    titles_json = json.dumps(exact_titles, indent=2)
+    
+    # Build template
+    exp_template = {}
+    for title in exact_titles:
+        exp_template[title] = ["bullet 1", "bullet 2"]
+    exp_json = json.dumps(exp_template, indent=2)
+    
     return f"""
 MASTER CV
 {cv_text}
@@ -99,24 +107,13 @@ Tasks:
 3. Add relevant ATS keywords where appropriate.
 4. Do not fabricate any experience.
 
+CRITICAL: Use EXACTLY these job titles as keys (copy them exactly):
+{titles_json}
+
 Return JSON in this format:
 {{
     "summary": "...",
-    "experience": {{
-        "Chief of Staff (Feb 2023-To Date)": [
-            "...",
-            "...",
-            "..."
-        ],
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
-            "...",
-            "..."
-        ],
-        "Chief Operations Officer | Jul 2016 -- Jul 2021": [
-            "...",
-            "..."
-        ]
-    }}
+    "experience": {exp_json}
 }}
 """
 
@@ -217,7 +214,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
     
     print(f"\n📌 Found: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}")
     
-    # 1. UPDATE SUMMARY - Calibri Body 12
+    # 1. UPDATE SUMMARY
     if summary_pos != -1 and new_summary:
         end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         for i in range(summary_pos + 1, end_pos):
@@ -231,7 +228,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 run.font.size = Pt(12)
         print(f"✅ Summary updated with Calibri 12")
     
-    # 2. UPDATE SKILLS - Two-column table format
+    # 2. UPDATE SKILLS
     if skills_pos != -1:
         print(f"\n📝 Rebuilding skills section...")
         
@@ -255,7 +252,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
         
-        # Create table
         table = doc.add_table(rows=5, cols=2)
         table.style = 'Table Grid'
         table.autofit = False
@@ -283,50 +279,77 @@ def create_tailored_docx(template_path, new_summary, new_experience):
         
         print(f"✅ Skills table created with Calibri 12")
     
-    # 3. UPDATE EXPERIENCE - Using stored master data with AI tailored bullets
+    # 3. UPDATE EXPERIENCE with improved matching
     if experience_pos != -1 and new_experience:
         print(f"\n📝 Updating experience with formatting...")
         
-        # Find job positions in document
-        job_positions = []
+        # Get ALL job titles from the document
+        doc_job_titles = []
         for i, para in enumerate(doc.paragraphs):
             text = para.text.strip()
             if '(' in text and ')' in text:
                 if any(keyword in text.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager']):
-                    job_positions.append((i, text))
+                    doc_job_titles.append((i, text))
         
-        # Process each job in order
-        for job_title in JOB_ORDER:
-            if job_title not in new_experience:
-                continue
-            
-            new_bullets = new_experience[job_title]
-            job_data = MASTER_EXPERIENCE.get(job_title, {})
-            company_name = job_data.get('company', '')
-            
+        print(f"📌 Document job titles found: {len(doc_job_titles)}")
+        for i, title in doc_job_titles:
+            print(f"  - {title[:50]}...")
+        
+        for job_title, new_bullets in new_experience.items():
             print(f"  Looking for: {job_title[:40]}...")
             
-            # Find matching job
             job_idx = -1
-            for i, text in job_positions:
-                if job_title in text or text in job_title:
+            matched_title = ""
+            
+            # Strategy 1: Exact match
+            for i, text in doc_job_titles:
+                if text == job_title:
                     job_idx = i
+                    matched_title = text
                     break
+            
+            # Strategy 2: Contains match
+            if job_idx == -1:
+                for i, text in doc_job_titles:
+                    if job_title in text or text in job_title:
+                        job_idx = i
+                        matched_title = text
+                        break
+            
+            # Strategy 3: Clean and compare
+            if job_idx == -1:
+                clean_job = re.sub(r'[^a-zA-Z0-9 ]', '', job_title.lower())
+                for i, text in doc_job_titles:
+                    clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', text.lower())
+                    if clean_job in clean_text or clean_text in clean_job:
+                        job_idx = i
+                        matched_title = text
+                        break
+            
+            # Strategy 4: Keyword matching
+            if job_idx == -1:
+                keywords = re.findall(r'\b(Chief|Senior|Advisor|Officer|Manager)\b', job_title, re.IGNORECASE)
+                for i, text in doc_job_titles:
+                    if any(keyword.lower() in text.lower() for keyword in keywords):
+                        if any(year in text for year in ['2023', '2022', '2021', '2020']):
+                            job_idx = i
+                            matched_title = text
+                            break
             
             if job_idx == -1:
                 print(f"    ⚠️ Job not found: {job_title[:40]}")
                 continue
             
-            print(f"    ✅ Found at index {job_idx}")
+            print(f"    ✅ Found at index {job_idx}: {matched_title[:40]}")
             
             # Find end of this job section
             end_idx = len(doc.paragraphs)
-            for next_pos, _ in job_positions:
+            for next_pos, _ in doc_job_titles:
                 if next_pos > job_idx and next_pos < end_idx:
                     end_idx = next_pos
                     break
             
-            # Find and update company name
+            # Update company name formatting
             for i in range(job_idx + 1, end_idx):
                 if i < len(doc.paragraphs):
                     text = doc.paragraphs[i].text.strip()
@@ -345,6 +368,8 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     text = doc.paragraphs[i].text.strip()
                     if text.startswith('-') or text.startswith('•') or text.startswith('*'):
                         bullet_indices.append(i)
+            
+            print(f"    Found {len(bullet_indices)} bullet points")
             
             # Clear existing bullets
             for i in bullet_indices:
@@ -366,7 +391,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                         run.font.name = 'Calibri'
                         run.font.size = Pt(12)
             
-            # Apply formatting to job title (Segoe UI 12 Bold)
+            # Apply formatting to job title
             if job_idx < len(doc.paragraphs):
                 para = doc.paragraphs[job_idx]
                 for run in para.runs:
@@ -392,7 +417,6 @@ def process_application(job_description):
     if not os.path.exists(COVER_PATH):
         return None, None, f"Cover letter template not found: {COVER_PATH}"
     
-    # Build CV text from stored master experience
     cv_text = build_cv_text_from_master()
     cover_text = read_docx(COVER_PATH)
     
@@ -425,7 +449,6 @@ def process_application(job_description):
         print("📄 Generating tailored CV...")
         cv_output = create_tailored_docx(CV_PATH, tailored_summary, tailored_experience)
         
-        # Cover letter
         cover_doc = Document(COVER_PATH)
         if tailored_cover:
             new_paragraphs = [p for p in tailored_cover.split('\n') if p.strip()]
