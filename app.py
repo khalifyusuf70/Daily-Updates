@@ -29,7 +29,47 @@ CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# AI PROMPTS (From Your Gist)
+# STORED MASTER EXPERIENCES - YOU ONLY PASTE ONCE
+# ---------------------------
+MASTER_EXPERIENCE = {
+    "Chief of Staff (Feb 2023-To Date)": {
+        "company": "Jubaland State of Somalia",
+        "bullets": [
+            "Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan, mirroring cross-functional team coordination for communication campaigns.",
+            "Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners to advance policy and program alignment.",
+            "Spearheaded emergency response efforts during political and humanitarian crises, demonstrating rapid adaptation to evolving contexts and ensuring coordinated resource allocation and stakeholder communication.",
+            "Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance, service delivery, and advocacy initiatives, enhancing program sustainability."
+        ]
+    },
+    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": {
+        "company": "Ministry of Planning, Jubaland State, Somalia",
+        "bullets": [
+            "Led humanitarian and development needs assessments, identifying priority program areas and in-country stakeholders to inform strategic planning and successful funding proposals for international donors.",
+            "Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance to ensure alignment with grant agreements and reporting deadlines.",
+            "Established and maintained partnerships with UN agencies, international NGOs, and civil society organizations to foster collaboration on peacebuilding and advocacy initiatives, strengthening regional outreach.",
+            "Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy, keeping abreast of country contexts to support informed decision-making and external communications."
+        ]
+    },
+    "Chief Operations Officer | Jul 2016 -- Jul 2021": {
+        "company": "KIMS MICROFINANCE, Somalia",
+        "bullets": [
+            "Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and ensure efficient program delivery.",
+            "Led business development initiatives, expanding into new regions and securing funding for microenterprise programs that supported vulnerable populations, demonstrating multi-regional grant management capability.",
+            "Established and managed strategic partnerships with international development organizations to enhance program impact and sustainability, mirroring the coordination of local grantees and partners.",
+            "Represented the organization to government agencies, donors, and partners, managing stakeholder relations and contributing to policy discussions on economic empowerment and social development."
+        ]
+    }
+}
+
+# Job order (most recent first)
+JOB_ORDER = [
+    "Chief of Staff (Feb 2023-To Date)",
+    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
+    "Chief Operations Officer | Jul 2016 -- Jul 2021"
+]
+
+# ---------------------------
+# AI PROMPTS
 # ---------------------------
 SYSTEM_PROMPT = """
 You are an expert executive resume writer and ATS optimization specialist.
@@ -113,19 +153,18 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-def extract_job_titles(cv_text):
-    """Extract exact job titles from CV text for matching"""
-    job_titles = []
-    lines = cv_text.split('\n')
-    for line in lines:
-        if '(' in line and ')' in line and any(y in line for y in ['2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016']):
-            if any(keyword in line.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager', 'director']):
-                clean = re.sub(r'\{#.*?\}', '', line)
-                clean = re.sub(r'\.Styl\d+', '', clean)
-                clean = re.sub(r'#', '', line)
-                if clean.strip():
-                    job_titles.append(clean.strip())
-    return job_titles
+def build_cv_text_from_master():
+    """Build CV text from stored master experience"""
+    cv_text = ""
+    for job_title in JOB_ORDER:
+        if job_title in MASTER_EXPERIENCE:
+            job_data = MASTER_EXPERIENCE[job_title]
+            cv_text += f"{job_title}\n"
+            cv_text += f"{job_data['company']}\n"
+            for bullet in job_data['bullets']:
+                cv_text += f"- {bullet}\n"
+            cv_text += "\n"
+    return cv_text
 
 def tailor_cover_letter(cover_text, cv_text, job_description):
     """Generate tailored cover letter"""
@@ -157,12 +196,7 @@ Return ONLY the cover letter text.
 
 def create_tailored_docx(template_path, new_summary, new_experience):
     """
-    Create tailored CV with ALL formatting requirements:
-    - Calibri Body 12 for all text
-    - Segoe UI 12 Bold for job titles
-    - Segoe UI 12 Italic for company names
-    - Skills in two-column table format
-    - Experience in correct order (most recent first)
+    Create tailored CV with ALL formatting requirements
     """
     doc = Document(template_path)
     
@@ -192,7 +226,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
         if summary_pos + 1 < len(doc.paragraphs):
             para = doc.paragraphs[summary_pos + 1]
             para.text = new_summary
-            # Apply Calibri Body 12
             for run in para.runs:
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
@@ -202,7 +235,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
     if skills_pos != -1:
         print(f"\n📝 Rebuilding skills section...")
         
-        # Define skills in two columns as requested
         skills_left = [
             "• Resource Mobilization & Grants Management",
             "• Foundation Pipeline Management",
@@ -217,35 +249,20 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             "• Strategic Planning & Organizational Dev."
         ]
         
-        # Find end of skills section
         end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
         
-        # Clear existing skills content
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
         
-        # Create a table for skills (2 columns)
-        # Find the position to insert table
-        table_pos = skills_pos + 1
-        
-        # Remove any existing table at this position
-        for i in range(table_pos, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        
-        # Create new table with 2 columns
+        # Create table
         table = doc.add_table(rows=5, cols=2)
         table.style = 'Table Grid'
         table.autofit = False
-        
-        # Set column widths
         table.columns[0].width = Inches(3.5)
         table.columns[1].width = Inches(3.5)
         
-        # Fill table with skills
         for row_idx in range(5):
-            # Left column
             left_cell = table.cell(row_idx, 0)
             left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
             left_para = left_cell.paragraphs[0]
@@ -253,7 +270,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
             
-            # Right column
             right_cell = table.cell(row_idx, 1)
             right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
             right_para = right_cell.paragraphs[0]
@@ -261,25 +277,15 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
         
-        # Move table to correct position
-        # Get the table element and move it after the header
         table_element = table._element
         parent = doc.element.body
-        # Insert table after the skills header
-        parent.insert(summary_pos + 2, table_element)
+        parent.insert(skills_pos + 2, table_element)
         
         print(f"✅ Skills table created with Calibri 12")
     
-    # 3. UPDATE EXPERIENCE - With proper formatting
+    # 3. UPDATE EXPERIENCE - Using stored master data with AI tailored bullets
     if experience_pos != -1 and new_experience:
         print(f"\n📝 Updating experience with formatting...")
-        
-        # Get job titles in correct order (most recent first)
-        job_order = [
-            "Chief of Staff (Feb 2023-To Date)",
-            "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
-            "Chief Operations Officer | Jul 2016 -- Jul 2021"
-        ]
         
         # Find job positions in document
         job_positions = []
@@ -290,11 +296,14 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     job_positions.append((i, text))
         
         # Process each job in order
-        for job_title in job_order:
+        for job_title in JOB_ORDER:
             if job_title not in new_experience:
                 continue
             
             new_bullets = new_experience[job_title]
+            job_data = MASTER_EXPERIENCE.get(job_title, {})
+            company_name = job_data.get('company', '')
+            
             print(f"  Looking for: {job_title[:40]}...")
             
             # Find matching job
@@ -317,13 +326,16 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     end_idx = next_pos
                     break
             
-            # Find employer line (company name)
-            company_name = ""
+            # Find and update company name
             for i in range(job_idx + 1, end_idx):
                 if i < len(doc.paragraphs):
                     text = doc.paragraphs[i].text.strip()
                     if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                        company_name = text
+                        para = doc.paragraphs[i]
+                        for run in para.runs:
+                            run.font.name = 'Segoe UI'
+                            run.font.size = Pt(12)
+                            run.font.italic = True
                         break
             
             # Find bullet points
@@ -341,7 +353,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             
             # Insert new bullets
             for i, bullet_text in enumerate(new_bullets):
-                insert_pos = job_idx + 2 + i  # After job title and company
+                insert_pos = job_idx + 2 + i
                 if insert_pos < len(doc.paragraphs):
                     para = doc.paragraphs[insert_pos]
                     para.text = f"• {bullet_text}"
@@ -349,7 +361,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                         run.font.name = 'Calibri'
                         run.font.size = Pt(12)
                 else:
-                    # Add new paragraph
                     para = doc.add_paragraph(f"• {bullet_text}")
                     for run in para.runs:
                         run.font.name = 'Calibri'
@@ -362,19 +373,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     run.font.name = 'Segoe UI'
                     run.font.size = Pt(12)
                     run.font.bold = True
-            
-            # Apply formatting to company name (Segoe UI 12 Italic)
-            if company_name:
-                for i in range(job_idx + 1, end_idx):
-                    if i < len(doc.paragraphs):
-                        text = doc.paragraphs[i].text.strip()
-                        if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                            para = doc.paragraphs[i]
-                            for run in para.runs:
-                                run.font.name = 'Segoe UI'
-                                run.font.size = Pt(12)
-                                run.font.italic = True
-                            break
             
             print(f"    ✅ Updated with {len(new_bullets)} bullets")
     
@@ -394,11 +392,14 @@ def process_application(job_description):
     if not os.path.exists(COVER_PATH):
         return None, None, f"Cover letter template not found: {COVER_PATH}"
     
-    cv_text = read_docx(CV_PATH)
+    # Build CV text from stored master experience
+    cv_text = build_cv_text_from_master()
     cover_text = read_docx(COVER_PATH)
     
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
+    
+    print(f"📄 CV text built from master experience: {len(cv_text)} characters")
     
     try:
         print("🤖 Tailoring CV with AI...")
