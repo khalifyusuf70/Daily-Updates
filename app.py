@@ -25,47 +25,43 @@ client = OpenAI(
     base_url="https://api.deepseek.com/v1"
 )
 
-CV_PATH = "Master_CV.docx"
-COVER_PATH = "Cover_Template.docx"
+# Master CV template - this will be used to build the document
+MASTER_CV_TEMPLATE = """
+# Summary
+[Summary will be replaced by AI]
 
-# ---------------------------
-# STORED MASTER EXPERIENCES
-# ---------------------------
-MASTER_EXPERIENCE = {
-    "Chief of Staff (Feb 2023-To Date)": {
-        "company": "Jubaland State of Somalia",
-        "bullets": [
-            "Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan, mirroring cross-functional team coordination for communication campaigns.",
-            "Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners to advance policy and program alignment.",
-            "Spearheaded emergency response efforts during political and humanitarian crises, demonstrating rapid adaptation to evolving contexts and ensuring coordinated resource allocation and stakeholder communication.",
-            "Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance, service delivery, and advocacy initiatives, enhancing program sustainability."
-        ]
-    },
-    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": {
-        "company": "Ministry of Planning, Jubaland State, Somalia",
-        "bullets": [
-            "Led humanitarian and development needs assessments, identifying priority program areas and in-country stakeholders to inform strategic planning and successful funding proposals for international donors.",
-            "Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance to ensure alignment with grant agreements and reporting deadlines.",
-            "Established and maintained partnerships with UN agencies, international NGOs, and civil society organizations to foster collaboration on peacebuilding and advocacy initiatives, strengthening regional outreach.",
-            "Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy, keeping abreast of country contexts to support informed decision-making and external communications."
-        ]
-    },
-    "Chief Operations Officer | Jul 2016 -- Jul 2021": {
-        "company": "KIMS MICROFINANCE, Somalia",
-        "bullets": [
-            "Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and ensure efficient program delivery.",
-            "Led business development initiatives, expanding into new regions and securing funding for microenterprise programs that supported vulnerable populations, demonstrating multi-regional grant management capability.",
-            "Established and managed strategic partnerships with international development organizations to enhance program impact and sustainability, mirroring the coordination of local grantees and partners.",
-            "Represented the organization to government agencies, donors, and partners, managing stakeholder relations and contributing to policy discussions on economic empowerment and social development."
-        ]
-    }
-}
+# Skill Highlights
+[Skills will be inserted here]
 
-JOB_ORDER = [
-    "Chief of Staff (Feb 2023-To Date)",
-    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
-    "Chief Operations Officer | Jul 2016 -- Jul 2021"
-]
+# Experience
+
+Chief of Staff (Feb 2023-To Date)
+Jubaland State of Somalia
+- Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan, mirroring cross-functional team coordination for communication campaigns.
+- Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners to advance policy and program alignment.
+- Spearheaded emergency response efforts during political and humanitarian crises, demonstrating rapid adaptation to evolving contexts and ensuring coordinated resource allocation and stakeholder communication.
+- Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance, service delivery, and advocacy initiatives, enhancing program sustainability.
+
+Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023
+Ministry of Planning, Jubaland State, Somalia
+- Led humanitarian and development needs assessments, identifying priority program areas and in-country stakeholders to inform strategic planning and successful funding proposals for international donors.
+- Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance to ensure alignment with grant agreements and reporting deadlines.
+- Established and maintained partnerships with UN agencies, international NGOs, and civil society organizations to foster collaboration on peacebuilding and advocacy initiatives, strengthening regional outreach.
+- Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy, keeping abreast of country contexts to support informed decision-making and external communications.
+
+Chief Operations Officer | Jul 2016 -- Jul 2021
+KIMS MICROFINANCE, Somalia
+- Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and ensure efficient program delivery.
+- Led business development initiatives, expanding into new regions and securing funding for microenterprise programs that supported vulnerable populations, demonstrating multi-regional grant management capability.
+- Established and managed strategic partnerships with international development organizations to enhance program impact and sustainability, mirroring the coordination of local grantees and partners.
+- Represented the organization to government agencies, donors, and partners, managing stakeholder relations and contributing to policy discussions on economic empowerment and social development.
+
+# Education
+[Your education here]
+
+# REFREES
+[Your referees here]
+"""
 
 # ---------------------------
 # AI PROMPTS
@@ -85,15 +81,6 @@ Rules:
 """
 
 def build_user_prompt(cv_text, job_description):
-    exact_titles = list(MASTER_EXPERIENCE.keys())
-    titles_json = json.dumps(exact_titles, indent=2)
-    
-    # Build template
-    exp_template = {}
-    for title in exact_titles:
-        exp_template[title] = ["bullet 1", "bullet 2"]
-    exp_json = json.dumps(exp_template, indent=2)
-    
     return f"""
 MASTER CV
 {cv_text}
@@ -107,13 +94,14 @@ Tasks:
 3. Add relevant ATS keywords where appropriate.
 4. Do not fabricate any experience.
 
-CRITICAL: Use EXACTLY these job titles as keys (copy them exactly):
-{titles_json}
-
 Return JSON in this format:
 {{
     "summary": "...",
-    "experience": {exp_json}
+    "experience": {{
+        "Chief of Staff (Feb 2023-To Date)": ["...", "..."],
+        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": ["...", "..."],
+        "Chief Operations Officer | Jul 2016 -- Jul 2021": ["...", "..."]
+    }}
 }}
 """
 
@@ -135,34 +123,8 @@ def call_ai(cv_text, job_description):
         raise e
 
 # ---------------------------
-# HELPER FUNCTIONS
+# COVER LETTER
 # ---------------------------
-def read_docx(file_path):
-    """Extract text from .docx file"""
-    try:
-        doc = Document(file_path)
-        paragraphs = []
-        for para in doc.paragraphs:
-            if para.text.strip():
-                paragraphs.append(para.text)
-        return "\n".join(paragraphs)
-    except Exception as e:
-        print(f"Error reading {file_path}: {str(e)}")
-        return ""
-
-def build_cv_text_from_master():
-    """Build CV text from stored master experience"""
-    cv_text = ""
-    for job_title in JOB_ORDER:
-        if job_title in MASTER_EXPERIENCE:
-            job_data = MASTER_EXPERIENCE[job_title]
-            cv_text += f"{job_title}\n"
-            cv_text += f"{job_data['company']}\n"
-            for bullet in job_data['bullets']:
-                cv_text += f"- {bullet}\n"
-            cv_text += "\n"
-    return cv_text
-
 def tailor_cover_letter(cover_text, cv_text, job_description):
     """Generate tailored cover letter"""
     prompt = f"""
@@ -191,215 +153,214 @@ Return ONLY the cover letter text.
         print(f"Cover letter error: {str(e)}")
         return cover_text
 
-def create_tailored_docx(template_path, new_summary, new_experience):
+def read_docx(file_path):
+    """Extract text from .docx file"""
+    try:
+        doc = Document(file_path)
+        paragraphs = []
+        for para in doc.paragraphs:
+            if para.text.strip():
+                paragraphs.append(para.text)
+        return "\n".join(paragraphs)
+    except Exception as e:
+        print(f"Error reading {file_path}: {str(e)}")
+        return ""
+
+def create_tailored_docx(new_summary, new_experience):
     """
-    Create tailored CV with ALL formatting requirements
+    Create tailored CV from scratch with ALL formatting requirements
     """
-    doc = Document(template_path)
+    # Create a new document
+    doc = Document()
     
-    # Find section positions
-    summary_pos = -1
-    skills_pos = -1
-    experience_pos = -1
+    # Set default font to Calibri 12
+    style = doc.styles['Normal']
+    style.font.name = 'Calibri'
+    style.font.size = Pt(12)
     
-    for i, para in enumerate(doc.paragraphs):
-        text = para.text.lower().strip()
-        if 'summary' in text and len(text) < 30:
-            summary_pos = i
-        elif 'skill' in text and len(text) < 30:
-            skills_pos = i
-        elif 'experience' in text and len(text) < 30:
-            experience_pos = i
-            break
+    # Title/Header
+    header_para = doc.add_paragraph("+252611385559/+254715244144")
+    header_para.runs[0].font.name = 'Calibri'
+    header_para.runs[0].font.size = Pt(12)
     
-    print(f"\n📌 Found: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}")
+    doc.add_paragraph("cos.presidency@jubalandstate.so")
+    doc.add_paragraph("khalifyusuf@agileanalytica.com")
+    doc.add_paragraph("")
     
-    # 1. UPDATE SUMMARY
-    if summary_pos != -1 and new_summary:
-        end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
-        for i in range(summary_pos + 1, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        if summary_pos + 1 < len(doc.paragraphs):
-            para = doc.paragraphs[summary_pos + 1]
-            para.text = new_summary
-            for run in para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-        print(f"✅ Summary updated with Calibri 12")
+    # 1. SUMMARY SECTION
+    summary_header = doc.add_paragraph("# Summary")
+    summary_header.runs[0].font.name = 'Calibri'
+    summary_header.runs[0].font.size = Pt(12)
+    summary_header.runs[0].bold = True
     
-    # 2. UPDATE SKILLS
-    if skills_pos != -1:
-        print(f"\n📝 Rebuilding skills section...")
-        
-        skills_left = [
-            "• Resource Mobilization & Grants Management",
-            "• Foundation Pipeline Management",
-            "• Due Diligence & Risk Assessment",
-            "• Impact Reporting & Communication",
-            "• Political & Contextual Analysis"
-        ]
-        skills_right = [
-            "• Team Leadership & Organizational Development",
-            "• Risk Management & Compliance",
-            "• Humanitarian Response Programming",
-            "• Strategic Planning & Organizational Dev."
-        ]
-        
-        end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
-        
-        for i in range(skills_pos + 1, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        
-        table = doc.add_table(rows=5, cols=2)
-        table.style = 'Table Grid'
-        table.autofit = False
-        table.columns[0].width = Inches(3.5)
-        table.columns[1].width = Inches(3.5)
-        
-        for row_idx in range(5):
-            left_cell = table.cell(row_idx, 0)
-            left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
-            left_para = left_cell.paragraphs[0]
-            for run in left_para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-            
-            right_cell = table.cell(row_idx, 1)
-            right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
-            right_para = right_cell.paragraphs[0]
-            for run in right_para.runs:
-                run.font.name = 'Calibri'
-                run.font.size = Pt(12)
-        
-        table_element = table._element
-        parent = doc.element.body
-        parent.insert(skills_pos + 2, table_element)
-        
-        print(f"✅ Skills table created with Calibri 12")
+    if new_summary:
+        summary_para = doc.add_paragraph(new_summary)
+        summary_para.runs[0].font.name = 'Calibri'
+        summary_para.runs[0].font.size = Pt(12)
+    doc.add_paragraph("")
     
-    # 3. UPDATE EXPERIENCE with improved matching
-    if experience_pos != -1 and new_experience:
-        print(f"\n📝 Updating experience with formatting...")
+    # 2. SKILLS SECTION
+    skills_header = doc.add_paragraph("# Skill Highlights")
+    skills_header.runs[0].font.name = 'Calibri'
+    skills_header.runs[0].font.size = Pt(12)
+    skills_header.runs[0].bold = True
+    
+    # Skills table (2 columns)
+    skills_left = [
+        "• Resource Mobilization & Grants Management",
+        "• Foundation Pipeline Management",
+        "• Due Diligence & Risk Assessment",
+        "• Impact Reporting & Communication",
+        "• Political & Contextual Analysis"
+    ]
+    skills_right = [
+        "• Team Leadership & Organizational Development",
+        "• Risk Management & Compliance",
+        "• Humanitarian Response Programming",
+        "• Strategic Planning & Organizational Dev."
+    ]
+    
+    table = doc.add_table(rows=5, cols=2)
+    table.style = 'Table Grid'
+    table.autofit = False
+    table.columns[0].width = Inches(3.5)
+    table.columns[1].width = Inches(3.5)
+    
+    for row_idx in range(5):
+        left_cell = table.cell(row_idx, 0)
+        left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
+        left_para = left_cell.paragraphs[0]
+        for run in left_para.runs:
+            run.font.name = 'Calibri'
+            run.font.size = Pt(12)
         
-        # Get ALL job titles from the document
-        doc_job_titles = []
-        for i, para in enumerate(doc.paragraphs):
-            text = para.text.strip()
-            if '(' in text and ')' in text:
-                if any(keyword in text.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager']):
-                    doc_job_titles.append((i, text))
+        right_cell = table.cell(row_idx, 1)
+        right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
+        right_para = right_cell.paragraphs[0]
+        for run in right_para.runs:
+            run.font.name = 'Calibri'
+            run.font.size = Pt(12)
+    
+    doc.add_paragraph("")
+    
+    # 3. EXPERIENCE SECTION
+    exp_header = doc.add_paragraph("# Experience")
+    exp_header.runs[0].font.name = 'Calibri'
+    exp_header.runs[0].font.size = Pt(12)
+    exp_header.runs[0].bold = True
+    
+    # Job order
+    JOB_ORDER = [
+        "Chief of Staff (Feb 2023-To Date)",
+        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
+        "Chief Operations Officer | Jul 2016 -- Jul 2021"
+    ]
+    
+    # Company names
+    companies = {
+        "Chief of Staff (Feb 2023-To Date)": "Jubaland State of Somalia",
+        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": "Ministry of Planning, Jubaland State, Somalia",
+        "Chief Operations Officer | Jul 2016 -- Jul 2021": "KIMS MICROFINANCE, Somalia"
+    }
+    
+    for job_title in JOB_ORDER:
+        # Job Title - Segoe UI 12 Bold
+        job_para = doc.add_paragraph(job_title)
+        job_para.runs[0].font.name = 'Segoe UI'
+        job_para.runs[0].font.size = Pt(12)
+        job_para.runs[0].bold = True
         
-        print(f"📌 Document job titles found: {len(doc_job_titles)}")
-        for i, title in doc_job_titles:
-            print(f"  - {title[:50]}...")
+        # Company - Segoe UI 12 Italic
+        company_para = doc.add_paragraph(companies.get(job_title, ""))
+        company_para.runs[0].font.name = 'Segoe UI'
+        company_para.runs[0].font.size = Pt(12)
+        company_para.runs[0].italic = True
         
-        for job_title, new_bullets in new_experience.items():
-            print(f"  Looking for: {job_title[:40]}...")
-            
-            job_idx = -1
-            matched_title = ""
-            
-            # Strategy 1: Exact match
-            for i, text in doc_job_titles:
-                if text == job_title:
-                    job_idx = i
-                    matched_title = text
-                    break
-            
-            # Strategy 2: Contains match
-            if job_idx == -1:
-                for i, text in doc_job_titles:
-                    if job_title in text or text in job_title:
-                        job_idx = i
-                        matched_title = text
-                        break
-            
-            # Strategy 3: Clean and compare
-            if job_idx == -1:
-                clean_job = re.sub(r'[^a-zA-Z0-9 ]', '', job_title.lower())
-                for i, text in doc_job_titles:
-                    clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', text.lower())
-                    if clean_job in clean_text or clean_text in clean_job:
-                        job_idx = i
-                        matched_title = text
-                        break
-            
-            # Strategy 4: Keyword matching
-            if job_idx == -1:
-                keywords = re.findall(r'\b(Chief|Senior|Advisor|Officer|Manager)\b', job_title, re.IGNORECASE)
-                for i, text in doc_job_titles:
-                    if any(keyword.lower() in text.lower() for keyword in keywords):
-                        if any(year in text for year in ['2023', '2022', '2021', '2020']):
-                            job_idx = i
-                            matched_title = text
-                            break
-            
-            if job_idx == -1:
-                print(f"    ⚠️ Job not found: {job_title[:40]}")
-                continue
-            
-            print(f"    ✅ Found at index {job_idx}: {matched_title[:40]}")
-            
-            # Find end of this job section
-            end_idx = len(doc.paragraphs)
-            for next_pos, _ in doc_job_titles:
-                if next_pos > job_idx and next_pos < end_idx:
-                    end_idx = next_pos
-                    break
-            
-            # Update company name formatting
-            for i in range(job_idx + 1, end_idx):
-                if i < len(doc.paragraphs):
-                    text = doc.paragraphs[i].text.strip()
-                    if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                        para = doc.paragraphs[i]
-                        for run in para.runs:
-                            run.font.name = 'Segoe UI'
-                            run.font.size = Pt(12)
-                            run.font.italic = True
-                        break
-            
-            # Find bullet points
-            bullet_indices = []
-            for i in range(job_idx + 1, end_idx):
-                if i < len(doc.paragraphs):
-                    text = doc.paragraphs[i].text.strip()
-                    if text.startswith('-') or text.startswith('•') or text.startswith('*'):
-                        bullet_indices.append(i)
-            
-            print(f"    Found {len(bullet_indices)} bullet points")
-            
-            # Clear existing bullets
-            for i in bullet_indices:
-                if i < len(doc.paragraphs):
-                    doc.paragraphs[i].text = ""
-            
-            # Insert new bullets
-            for i, bullet_text in enumerate(new_bullets):
-                insert_pos = job_idx + 2 + i
-                if insert_pos < len(doc.paragraphs):
-                    para = doc.paragraphs[insert_pos]
-                    para.text = f"• {bullet_text}"
-                    for run in para.runs:
-                        run.font.name = 'Calibri'
-                        run.font.size = Pt(12)
-                else:
-                    para = doc.add_paragraph(f"• {bullet_text}")
-                    for run in para.runs:
-                        run.font.name = 'Calibri'
-                        run.font.size = Pt(12)
-            
-            # Apply formatting to job title
-            if job_idx < len(doc.paragraphs):
-                para = doc.paragraphs[job_idx]
-                for run in para.runs:
-                    run.font.name = 'Segoe UI'
-                    run.font.size = Pt(12)
-                    run.font.bold = True
-            
-            print(f"    ✅ Updated with {len(new_bullets)} bullets")
+        # Bullets
+        if job_title in new_experience:
+            for bullet in new_experience[job_title]:
+                bullet_para = doc.add_paragraph(f"• {bullet}")
+                bullet_para.runs[0].font.name = 'Calibri'
+                bullet_para.runs[0].font.size = Pt(12)
+        else:
+            # Fallback to master bullets
+            master_bullets = {
+                "Chief of Staff (Feb 2023-To Date)": [
+                    "Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan.",
+                    "Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners.",
+                    "Spearheaded emergency response efforts during political and humanitarian crises, ensuring coordinated resource allocation and stakeholder communication.",
+                    "Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance and service delivery."
+                ],
+                "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
+                    "Led humanitarian and development needs assessments to inform strategic planning and funding proposals for international donors.",
+                    "Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance.",
+                    "Established partnerships with UN agencies, NGOs, and civil society organizations to foster collaboration.",
+                    "Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy."
+                ],
+                "Chief Operations Officer | Jul 2016 -- Jul 2021": [
+                    "Directed all operational functions including budgeting, strategic planning, and resource allocation.",
+                    "Led business development initiatives, expanding into new regions and securing funding for microenterprise programs.",
+                    "Established strategic partnerships with international development organizations to enhance program impact.",
+                    "Represented the organization to government agencies, donors, and partners."
+                ]
+            }
+            for bullet in master_bullets.get(job_title, []):
+                bullet_para = doc.add_paragraph(f"• {bullet}")
+                bullet_para.runs[0].font.name = 'Calibri'
+                bullet_para.runs[0].font.size = Pt(12)
+        
+        doc.add_paragraph("")
+    
+    # 4. EDUCATION SECTION
+    edu_header = doc.add_paragraph("# Education")
+    edu_header.runs[0].font.name = 'Calibri'
+    edu_header.runs[0].font.size = Pt(12)
+    edu_header.runs[0].bold = True
+    
+    # Education from original
+    education = [
+        "Micro Masters. Database management System",
+        "University of Baltimore Maryland",
+        "Degree Actuarial Science and Statistics",
+        "JOMO KENYATTA UNIVERSITY",
+        "Nairobi, Kenya"
+    ]
+    for edu in education:
+        edu_para = doc.add_paragraph(edu)
+        edu_para.runs[0].font.name = 'Calibri'
+        edu_para.runs[0].font.size = Pt(12)
+    
+    doc.add_paragraph("")
+    
+    # 5. REFREES SECTION
+    ref_header = doc.add_paragraph("# REFREES")
+    ref_header.runs[0].font.name = 'Calibri'
+    ref_header.runs[0].font.size = Pt(12)
+    ref_header.runs[0].bold = True
+    
+    referees = [
+        "Abshir olow",
+        "Former Chief of Staff",
+        "Jubaland State, Somalia",
+        "+254722877178",
+        "abshirmabdi@gmail.com",
+        "",
+        "Mr. Abdirahman Abdi",
+        "Planning Minister, Jubaland",
+        "+252612992848",
+        "mopic@jubalandstate.so",
+        "",
+        "Omar Abdi Mohamed, HDmls, Msc.Int.",
+        "Commodity Logistics Director-USAID",
+        "omarabdi2@gmail.com"
+    ]
+    for ref in referees:
+        if ref:
+            ref_para = doc.add_paragraph(ref)
+            ref_para.runs[0].font.name = 'Calibri'
+            ref_para.runs[0].font.size = Pt(12)
+        else:
+            doc.add_paragraph()
     
     output = BytesIO()
     doc.save(output)
@@ -412,18 +373,19 @@ def create_tailored_docx(template_path, new_summary, new_experience):
 def process_application(job_description):
     """Process the entire application tailoring"""
     
-    if not os.path.exists(CV_PATH):
-        return None, None, f"CV file not found: {CV_PATH}"
-    if not os.path.exists(COVER_PATH):
-        return None, None, f"Cover letter template not found: {COVER_PATH}"
+    # Use the template as CV text
+    cv_text = MASTER_CV_TEMPLATE
     
-    cv_text = build_cv_text_from_master()
-    cover_text = read_docx(COVER_PATH)
+    # Get cover letter template
+    if os.path.exists(COVER_PATH):
+        cover_text = read_docx(COVER_PATH)
+    else:
+        cover_text = "Dear Hiring Manager,\n\n[Your cover letter will go here]\n\nSincerely,\n[Your Name]"
     
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
     
-    print(f"📄 CV text built from master experience: {len(cv_text)} characters")
+    print(f"📄 CV text built from master template: {len(cv_text)} characters")
     
     try:
         print("🤖 Tailoring CV with AI...")
@@ -447,9 +409,10 @@ def process_application(job_description):
     
     try:
         print("📄 Generating tailored CV...")
-        cv_output = create_tailored_docx(CV_PATH, tailored_summary, tailored_experience)
+        cv_output = create_tailored_docx(tailored_summary, tailored_experience)
         
-        cover_doc = Document(COVER_PATH)
+        # Cover letter
+        cover_doc = Document(COVER_PATH) if os.path.exists(COVER_PATH) else Document()
         if tailored_cover:
             new_paragraphs = [p for p in tailored_cover.split('\n') if p.strip()]
             for i, paragraph in enumerate(cover_doc.paragraphs):
