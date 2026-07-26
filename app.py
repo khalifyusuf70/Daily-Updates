@@ -11,17 +11,64 @@ from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
 from openai import OpenAI
 
 app = Flask(__name__)
-@@ -20,126 +25,462 @@
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+
+# ---------------------------
+# DEEPSEEK API CONFIGURATION
+# ---------------------------
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+if not DEEPSEEK_API_KEY:
+    print("⚠️ DEEPSEEK_API_KEY not set")
+
+client = OpenAI(
+    api_key=DEEPSEEK_API_KEY,
     base_url="https://api.deepseek.com/v1"
 )
 
-def call_deepseek(prompt):
-    """Call DeepSeek API with proper format"""
 CV_PATH = "Master_CV.docx"
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# AI PROMPTS (From Your Gist)
+# STORED MASTER EXPERIENCES
+# ---------------------------
+MASTER_EXPERIENCE = {
+    "Chief of Staff (Feb 2023-To Date)": {
+        "company": "Jubaland State of Somalia",
+        "bullets": [
+            "Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan, mirroring cross-functional team coordination for communication campaigns.",
+            "Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners to advance policy and program alignment.",
+            "Spearheaded emergency response efforts during political and humanitarian crises, demonstrating rapid adaptation to evolving contexts and ensuring coordinated resource allocation and stakeholder communication.",
+            "Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance, service delivery, and advocacy initiatives, enhancing program sustainability."
+        ]
+    },
+    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": {
+        "company": "Ministry of Planning, Jubaland State, Somalia",
+        "bullets": [
+            "Led humanitarian and development needs assessments, identifying priority program areas and in-country stakeholders to inform strategic planning and successful funding proposals for international donors.",
+            "Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance to ensure alignment with grant agreements and reporting deadlines.",
+            "Established and maintained partnerships with UN agencies, international NGOs, and civil society organizations to foster collaboration on peacebuilding and advocacy initiatives, strengthening regional outreach.",
+            "Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy, keeping abreast of country contexts to support informed decision-making and external communications."
+        ]
+    },
+    "Chief Operations Officer | Jul 2016 -- Jul 2021": {
+        "company": "KIMS MICROFINANCE, Somalia",
+        "bullets": [
+            "Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and ensure efficient program delivery.",
+            "Led business development initiatives, expanding into new regions and securing funding for microenterprise programs that supported vulnerable populations, demonstrating multi-regional grant management capability.",
+            "Established and managed strategic partnerships with international development organizations to enhance program impact and sustainability, mirroring the coordination of local grantees and partners.",
+            "Represented the organization to government agencies, donors, and partners, managing stakeholder relations and contributing to policy discussions on economic empowerment and social development."
+        ]
+    }
+}
+
+JOB_ORDER = [
+    "Chief of Staff (Feb 2023-To Date)",
+    "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
+    "Chief Operations Officer | Jul 2016 -- Jul 2021"
+]
+
+# ---------------------------
+# AI PROMPTS
 # ---------------------------
 SYSTEM_PROMPT = """
 You are an expert executive resume writer and ATS optimization specialist.
@@ -38,6 +85,15 @@ Rules:
 """
 
 def build_user_prompt(cv_text, job_description):
+    exact_titles = list(MASTER_EXPERIENCE.keys())
+    titles_json = json.dumps(exact_titles, indent=2)
+    
+    # Build template
+    exp_template = {}
+    for title in exact_titles:
+        exp_template[title] = ["bullet 1", "bullet 2"]
+    exp_json = json.dumps(exp_template, indent=2)
+    
     return f"""
 MASTER CV
 {cv_text}
@@ -51,24 +107,13 @@ Tasks:
 3. Add relevant ATS keywords where appropriate.
 4. Do not fabricate any experience.
 
+CRITICAL: Use EXACTLY these job titles as keys (copy them exactly):
+{titles_json}
+
 Return JSON in this format:
 {{
     "summary": "...",
-    "experience": {{
-        "Chief of Staff (Feb 2023-To Date)": [
-            "...",
-            "...",
-            "..."
-        ],
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
-            "...",
-            "..."
-        ],
-        "Chief Operations Officer | Jul 2016 -- Jul 2021": [
-            "...",
-            "..."
-        ]
-    }}
+    "experience": {exp_json}
 }}
 """
 
@@ -78,12 +123,9 @@ def call_ai(cv_text, job_description):
         response = client.chat.completions.create(
             model="deepseek-v4-pro",
             messages=[
-                {"role": "system", "content": "You are an expert CV tailoring assistant. Return ONLY valid JSON."},
-                {"role": "user", "content": prompt}
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(cv_text, job_description)},
             ],
-            temperature=0.4,
             temperature=0.2,
             response_format={"type": "json_object"}
         )
@@ -92,13 +134,6 @@ def call_ai(cv_text, job_description):
         print(f"DeepSeek API error: {str(e)}")
         raise e
 
-def tailor_cv_content(experience_text, job_description):
-    """
-    Generate tailored summary, experience bullets, and cover letter
-    """
-    
-    prompt = f"""
-You are a professional CV tailoring expert.
 # ---------------------------
 # HELPER FUNCTIONS
 # ---------------------------
@@ -115,21 +150,18 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-MY EXPERIENCE:
-{experience_text}
-def extract_job_titles(cv_text):
-    """Extract exact job titles from CV text for matching"""
-    job_titles = []
-    lines = cv_text.split('\n')
-    for line in lines:
-        if '(' in line and ')' in line and any(y in line for y in ['2023', '2022', '2021', '2020', '2019', '2018', '2017', '2016']):
-            if any(keyword in line.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager', 'director']):
-                clean = re.sub(r'\{#.*?\}', '', line)
-                clean = re.sub(r'\.Styl\d+', '', clean)
-                clean = re.sub(r'#', '', line)
-                if clean.strip():
-                    job_titles.append(clean.strip())
-    return job_titles
+def build_cv_text_from_master():
+    """Build CV text from stored master experience"""
+    cv_text = ""
+    for job_title in JOB_ORDER:
+        if job_title in MASTER_EXPERIENCE:
+            job_data = MASTER_EXPERIENCE[job_title]
+            cv_text += f"{job_title}\n"
+            cv_text += f"{job_data['company']}\n"
+            for bullet in job_data['bullets']:
+                cv_text += f"- {bullet}\n"
+            cv_text += "\n"
+    return cv_text
 
 def tailor_cover_letter(cover_text, cv_text, job_description):
     """Generate tailored cover letter"""
@@ -139,18 +171,9 @@ You are a professional cover letter writer.
 JOB DESCRIPTION:
 {job_description}
 
-TASK:
-Rewrite my CV content to perfectly match this job description, while being 100% truthful.
 COVER LETTER TEMPLATE:
 {cover_text}
 
-RULES:
-1. Write a compelling professional summary (4-6 sentences) that matches the job.
-2. For EACH job in my experience, rewrite the bullet points (4-5 per job) to highlight relevant achievements.
-3. Write a personalized cover letter (3 paragraphs) that connects my experience to the job.
-4. Do NOT invent new jobs, achievements, or numbers.
-5. Keep job titles, employers, and dates exactly as they appear.
-6. Use keywords from the job description naturally.
 Create a 3-paragraph cover letter that perfectly matches this job.
 Return ONLY the cover letter text.
 """
@@ -168,28 +191,9 @@ Return ONLY the cover letter text.
         print(f"Cover letter error: {str(e)}")
         return cover_text
 
-Return JSON:
-{{
-    "summary": "professional summary here",
-    "experience": {{
-        "Job Title 1 | Company | Date": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4"
-        ],
-        "Job Title 2 | Company | Date": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3"
 def create_tailored_docx(template_path, new_summary, new_experience):
     """
-    Create tailored CV with ALL formatting requirements:
-    - Calibri Body 12 for all text
-    - Segoe UI 12 Bold for job titles
-    - Segoe UI 12 Italic for company names
-    - Skills in two-column table format
-    - Experience in correct order (most recent first)
+    Create tailored CV with ALL formatting requirements
     """
     doc = Document(template_path)
     
@@ -210,7 +214,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
     
     print(f"\n📌 Found: Summary={summary_pos}, Skills={skills_pos}, Experience={experience_pos}")
     
-    # 1. UPDATE SUMMARY - Calibri Body 12
+    # 1. UPDATE SUMMARY
     if summary_pos != -1 and new_summary:
         end_pos = skills_pos if skills_pos > summary_pos else len(doc.paragraphs)
         for i in range(summary_pos + 1, end_pos):
@@ -219,17 +223,15 @@ def create_tailored_docx(template_path, new_summary, new_experience):
         if summary_pos + 1 < len(doc.paragraphs):
             para = doc.paragraphs[summary_pos + 1]
             para.text = new_summary
-            # Apply Calibri Body 12
             for run in para.runs:
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
         print(f"✅ Summary updated with Calibri 12")
     
-    # 2. UPDATE SKILLS - Two-column table format
+    # 2. UPDATE SKILLS
     if skills_pos != -1:
         print(f"\n📝 Rebuilding skills section...")
         
-        # Define skills in two columns as requested
         skills_left = [
             "• Resource Mobilization & Grants Management",
             "• Foundation Pipeline Management",
@@ -237,10 +239,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             "• Impact Reporting & Communication",
             "• Political & Contextual Analysis"
         ]
-    }},
-    "cover_letter": "full cover letter text here"
-}}
-"""
         skills_right = [
             "• Team Leadership & Organizational Development",
             "• Risk Management & Compliance",
@@ -248,35 +246,19 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             "• Strategic Planning & Organizational Dev."
         ]
         
-        # Find end of skills section
         end_pos = experience_pos if experience_pos > skills_pos else len(doc.paragraphs)
         
-        # Clear existing skills content
         for i in range(skills_pos + 1, end_pos):
             if i < len(doc.paragraphs):
                 doc.paragraphs[i].text = ""
         
-        # Create a table for skills (2 columns)
-        # Find the position to insert table
-        table_pos = skills_pos + 1
-        
-        # Remove any existing table at this position
-        for i in range(table_pos, end_pos):
-            if i < len(doc.paragraphs):
-                doc.paragraphs[i].text = ""
-        
-        # Create new table with 2 columns
         table = doc.add_table(rows=5, cols=2)
         table.style = 'Table Grid'
         table.autofit = False
-        
-        # Set column widths
         table.columns[0].width = Inches(3.5)
         table.columns[1].width = Inches(3.5)
         
-        # Fill table with skills
         for row_idx in range(5):
-            # Left column
             left_cell = table.cell(row_idx, 0)
             left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
             left_para = left_cell.paragraphs[0]
@@ -284,7 +266,6 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
             
-            # Right column
             right_cell = table.cell(row_idx, 1)
             right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
             right_para = right_cell.paragraphs[0]
@@ -292,70 +273,92 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                 run.font.name = 'Calibri'
                 run.font.size = Pt(12)
         
-        # Move table to correct position
-        # Get the table element and move it after the header
         table_element = table._element
         parent = doc.element.body
-        # Insert table after the skills header
-        parent.insert(summary_pos + 2, table_element)
+        parent.insert(skills_pos + 2, table_element)
         
         print(f"✅ Skills table created with Calibri 12")
-
-    return call_deepseek(prompt)
-    # 3. UPDATE EXPERIENCE - With proper formatting
+    
+    # 3. UPDATE EXPERIENCE with improved matching
     if experience_pos != -1 and new_experience:
         print(f"\n📝 Updating experience with formatting...")
         
-        # Get job titles in correct order (most recent first)
-        job_order = [
-            "Chief of Staff (Feb 2023-To Date)",
-            "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
-            "Chief Operations Officer | Jul 2016 -- Jul 2021"
-        ]
-        
-        # Find job positions in document
-        job_positions = []
+        # Get ALL job titles from the document
+        doc_job_titles = []
         for i, para in enumerate(doc.paragraphs):
             text = para.text.strip()
             if '(' in text and ')' in text:
                 if any(keyword in text.lower() for keyword in ['chief', 'senior', 'advisor', 'officer', 'manager']):
-                    job_positions.append((i, text))
+                    doc_job_titles.append((i, text))
         
-        # Process each job in order
-        for job_title in job_order:
-            if job_title not in new_experience:
-                continue
-            
-            new_bullets = new_experience[job_title]
+        print(f"📌 Document job titles found: {len(doc_job_titles)}")
+        for i, title in doc_job_titles:
+            print(f"  - {title[:50]}...")
+        
+        for job_title, new_bullets in new_experience.items():
             print(f"  Looking for: {job_title[:40]}...")
             
-            # Find matching job
             job_idx = -1
-            for i, text in job_positions:
-                if job_title in text or text in job_title:
+            matched_title = ""
+            
+            # Strategy 1: Exact match
+            for i, text in doc_job_titles:
+                if text == job_title:
                     job_idx = i
+                    matched_title = text
                     break
+            
+            # Strategy 2: Contains match
+            if job_idx == -1:
+                for i, text in doc_job_titles:
+                    if job_title in text or text in job_title:
+                        job_idx = i
+                        matched_title = text
+                        break
+            
+            # Strategy 3: Clean and compare
+            if job_idx == -1:
+                clean_job = re.sub(r'[^a-zA-Z0-9 ]', '', job_title.lower())
+                for i, text in doc_job_titles:
+                    clean_text = re.sub(r'[^a-zA-Z0-9 ]', '', text.lower())
+                    if clean_job in clean_text or clean_text in clean_job:
+                        job_idx = i
+                        matched_title = text
+                        break
+            
+            # Strategy 4: Keyword matching
+            if job_idx == -1:
+                keywords = re.findall(r'\b(Chief|Senior|Advisor|Officer|Manager)\b', job_title, re.IGNORECASE)
+                for i, text in doc_job_titles:
+                    if any(keyword.lower() in text.lower() for keyword in keywords):
+                        if any(year in text for year in ['2023', '2022', '2021', '2020']):
+                            job_idx = i
+                            matched_title = text
+                            break
             
             if job_idx == -1:
                 print(f"    ⚠️ Job not found: {job_title[:40]}")
                 continue
             
-            print(f"    ✅ Found at index {job_idx}")
+            print(f"    ✅ Found at index {job_idx}: {matched_title[:40]}")
             
             # Find end of this job section
             end_idx = len(doc.paragraphs)
-            for next_pos, _ in job_positions:
+            for next_pos, _ in doc_job_titles:
                 if next_pos > job_idx and next_pos < end_idx:
                     end_idx = next_pos
                     break
             
-            # Find employer line (company name)
-            company_name = ""
+            # Update company name formatting
             for i in range(job_idx + 1, end_idx):
                 if i < len(doc.paragraphs):
                     text = doc.paragraphs[i].text.strip()
                     if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                        company_name = text
+                        para = doc.paragraphs[i]
+                        for run in para.runs:
+                            run.font.name = 'Segoe UI'
+                            run.font.size = Pt(12)
+                            run.font.italic = True
                         break
             
             # Find bullet points
@@ -366,6 +369,8 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                     if text.startswith('-') or text.startswith('•') or text.startswith('*'):
                         bullet_indices.append(i)
             
+            print(f"    Found {len(bullet_indices)} bullet points")
+            
             # Clear existing bullets
             for i in bullet_indices:
                 if i < len(doc.paragraphs):
@@ -373,7 +378,7 @@ def create_tailored_docx(template_path, new_summary, new_experience):
             
             # Insert new bullets
             for i, bullet_text in enumerate(new_bullets):
-                insert_pos = job_idx + 2 + i  # After job title and company
+                insert_pos = job_idx + 2 + i
                 if insert_pos < len(doc.paragraphs):
                     para = doc.paragraphs[insert_pos]
                     para.text = f"• {bullet_text}"
@@ -381,32 +386,18 @@ def create_tailored_docx(template_path, new_summary, new_experience):
                         run.font.name = 'Calibri'
                         run.font.size = Pt(12)
                 else:
-                    # Add new paragraph
                     para = doc.add_paragraph(f"• {bullet_text}")
                     for run in para.runs:
                         run.font.name = 'Calibri'
                         run.font.size = Pt(12)
             
-            # Apply formatting to job title (Segoe UI 12 Bold)
+            # Apply formatting to job title
             if job_idx < len(doc.paragraphs):
                 para = doc.paragraphs[job_idx]
                 for run in para.runs:
                     run.font.name = 'Segoe UI'
                     run.font.size = Pt(12)
                     run.font.bold = True
-            
-            # Apply formatting to company name (Segoe UI 12 Italic)
-            if company_name:
-                for i in range(job_idx + 1, end_idx):
-                    if i < len(doc.paragraphs):
-                        text = doc.paragraphs[i].text.strip()
-                        if any(keyword in text for keyword in ['Jubaland', 'Ministry', 'KIMS']):
-                            para = doc.paragraphs[i]
-                            for run in para.runs:
-                                run.font.name = 'Segoe UI'
-                                run.font.size = Pt(12)
-                                run.font.italic = True
-                            break
             
             print(f"    ✅ Updated with {len(new_bullets)} bullets")
     
@@ -415,39 +406,32 @@ def create_tailored_docx(template_path, new_summary, new_experience):
     output.seek(0)
     return output
 
-def process_application(experience_text, job_description):
-    """Process the entire application"""
 # ---------------------------
 # MAIN PROCESSING
 # ---------------------------
 def process_application(job_description):
     """Process the entire application tailoring"""
-
-    if not experience_text or not job_description:
-        return None, "Please provide both experience and job description"
+    
     if not os.path.exists(CV_PATH):
         return None, None, f"CV file not found: {CV_PATH}"
     if not os.path.exists(COVER_PATH):
         return None, None, f"Cover letter template not found: {COVER_PATH}"
     
-    cv_text = read_docx(CV_PATH)
+    cv_text = build_cv_text_from_master()
     cover_text = read_docx(COVER_PATH)
     
     if not cv_text or not cover_text:
         return None, None, "Failed to read documents"
-
+    
+    print(f"📄 CV text built from master experience: {len(cv_text)} characters")
+    
     try:
-        print("🤖 Generating tailored content...")
-        result = tailor_cv_content(experience_text, job_description)
         print("🤖 Tailoring CV with AI...")
         result = call_ai(cv_text, job_description)
         
         tailored_summary = result.get('summary', '')
         tailored_experience = result.get('experience', {})
-
-        summary = result.get('summary', '')
-        experience = result.get('experience', {})
-        cover_letter = result.get('cover_letter', '')
+        
         print(f"📝 Summary: {tailored_summary[:100]}...")
         print(f"📝 Jobs: {list(tailored_experience.keys())}")
         
@@ -464,11 +448,7 @@ def process_application(job_description):
     try:
         print("📄 Generating tailored CV...")
         cv_output = create_tailored_docx(CV_PATH, tailored_summary, tailored_experience)
-
-        print(f"📝 Summary: {summary[:100]}...")
-        print(f"📝 Jobs: {list(experience.keys())}")
-        print(f"📝 Cover letter: {len(cover_letter)} characters")
-        # Cover letter
+        
         cover_doc = Document(COVER_PATH)
         if tailored_cover:
             new_paragraphs = [p for p in tailored_cover.split('\n') if p.strip()]
@@ -483,17 +463,11 @@ def process_application(job_description):
         cover_output = BytesIO()
         cover_doc.save(cover_output)
         cover_output.seek(0)
-
-        return {
-            'summary': summary,
-            'experience': experience,
-            'cover_letter': cover_letter
-        }, None
+        
         print("✅ Documents generated")
         return cv_output, cover_output, "Success"
-
+        
     except Exception as e:
-        return None, f"AI processing failed: {str(e)}"
         return None, None, f"Document generation error: {str(e)}"
 
 # ---------------------------
@@ -501,7 +475,6 @@ def process_application(job_description):
 # ---------------------------
 @app.route('/')
 def index():
-    return render_template('index.html')
     try:
         return render_template('index.html')
     except Exception as e:
@@ -510,32 +483,13 @@ def index():
 @app.route('/tailor', methods=['POST'])
 def tailor():
     try:
-        experience_text = request.form.get('experience', '').strip()
         job_description = request.form.get('job_description', '').strip()
         if not job_description:
             return jsonify({'error': 'Please paste a job description'}), 400
-
-        if not experience_text or not job_description:
-            return jsonify({'error': 'Please provide both your experience and the job description'}), 400
         
-        print(f"📝 Processing request...")
-        print(f"📝 Experience length: {len(experience_text)} characters")
-        print(f"📝 Job description length: {len(job_description)} characters")
         print(f"📝 Processing job: {len(job_description)} characters")
         cv_output, cover_output, message = process_application(job_description)
-
-        result, error = process_application(experience_text, job_description)
         
-        if error:
-            return jsonify({'error': error}), 500
-        
-        return jsonify({
-            'success': True,
-            'message': 'Content generated successfully!',
-            'summary': result['summary'],
-            'experience': result['experience'],
-            'cover_letter': result['cover_letter']
-        })
         if cv_output and cover_output:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             cv_base64 = base64.b64encode(cv_output.getvalue()).decode('utf-8')
@@ -551,10 +505,17 @@ def tailor():
             })
         else:
             return jsonify({'error': message}), 500
-
+            
     except Exception as e:
         print(f"❌ Error: {str(e)}")
-@@ -154,4 +495,5 @@ def health():
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/health')
+def health():
+    return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
+
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 8080))
     print(f"🚀 Starting CV Tailor on port {port}")
