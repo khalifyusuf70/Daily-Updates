@@ -25,10 +25,21 @@ client = OpenAI(
     base_url="https://api.deepseek.com/v1"
 )
 
-# Master CV template - this will be used to build the document
+# File paths
+COVER_PATH = "Cover_Template.docx"
+
+# ---------------------------
+# MASTER CV TEMPLATE - EXACTLY FROM YOUR MASTER_CV.docx
+# ---------------------------
 MASTER_CV_TEMPLATE = """
++252611385559/+254715244144
+
+cos.presidency@jubalandstate.so
+
+khalifyusuf@agileanalytica.com
+
 # Summary
-[Summary will be replaced by AI]
+I am a highly efficient professional with over 10 years of senior leadership experience managing complex portfolios across government and international development sectors. Proven ability to lead humanitarian response, civil society strengthening, and peacebuilding programs across the Horn of Africa. Expert in strategic leadership, programme growth, resource mobilization, and donor engagement. Strong track record in partnership development, locally led programming, and organizational transformation. Skilled in political analysis, contextual understanding, and managing multi-country operations.
 
 # Skill Highlights
 [Skills will be inserted here]
@@ -37,30 +48,52 @@ MASTER_CV_TEMPLATE = """
 
 Chief of Staff (Feb 2023-To Date)
 Jubaland State of Somalia
-- Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan, mirroring cross-functional team coordination for communication campaigns.
-- Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners to advance policy and program alignment.
-- Spearheaded emergency response efforts during political and humanitarian crises, demonstrating rapid adaptation to evolving contexts and ensuring coordinated resource allocation and stakeholder communication.
-- Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance, service delivery, and advocacy initiatives, enhancing program sustainability.
+- Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners to secure funding for state priorities and emergency response.
+- Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations to enhance governance, humanitarian response, and service delivery.
+- Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure alignment with the State Development Plan.
+- Program Growth & Strategy: Led the development and implementation of the comprehensive State Development Plan, translating high-level goals into actionable programs and policies.
+- Stakeholder Management: Represented the President at national and regional forums, managing complex relationships and ensuring aligned engagement across all partners.
+- Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.
+- Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery.
 
 Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023
 Ministry of Planning, Jubaland State, Somalia
-- Led humanitarian and development needs assessments, identifying priority program areas and in-country stakeholders to inform strategic planning and successful funding proposals for international donors.
-- Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance to ensure alignment with grant agreements and reporting deadlines.
-- Established and maintained partnerships with UN agencies, international NGOs, and civil society organizations to foster collaboration on peacebuilding and advocacy initiatives, strengthening regional outreach.
-- Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy, keeping abreast of country contexts to support informed decision-making and external communications.
+- Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.
+- Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.
+- Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development to align Ministry initiatives with national and regional priorities.
+- External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.
+- Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making.
 
 Chief Operations Officer | Jul 2016 -- Jul 2021
 KIMS MICROFINANCE, Somalia
-- Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and ensure efficient program delivery.
-- Led business development initiatives, expanding into new regions and securing funding for microenterprise programs that supported vulnerable populations, demonstrating multi-regional grant management capability.
-- Established and managed strategic partnerships with international development organizations to enhance program impact and sustainability, mirroring the coordination of local grantees and partners.
-- Represented the organization to government agencies, donors, and partners, managing stakeholder relations and contributing to policy discussions on economic empowerment and social development.
+- Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.
+- Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.
+- Partnership Management: Established and maintained strategic partnerships with international development organizations to enhance program impact and sustainability.
+- Community Engagement: Managed community relations, contributing to peacebuilding and social development through economic empowerment and locally-led programming.
+- Stakeholder Relations: Represented the organization to government agencies, donors, and partners, ensuring effective communication and stakeholder management.
 
 # Education
-[Your education here]
+Micro Masters. Database management System
+University of Baltimore Maryland
+Degree Actuarial Science and Statistics
+JOMO KENYATTA UNIVERSITY
+Nairobi, Kenya
 
 # REFREES
-[Your referees here]
+Abshir olow
+Former Chief of Staff
+Jubaland State, Somalia
++254722877178
+abshirmabdi@gmail.com
+
+Mr. Abdirahman Abdi
+Planning Minister, Jubaland
++252612992848
+mopic@jubalandstate.so
+
+Omar Abdi Mohamed, HDmls, Msc.Int.
+Commodity Logistics Director-USAID
+omarabdi2@gmail.com
 """
 
 # ---------------------------
@@ -283,25 +316,30 @@ def create_tailored_docx(new_summary, new_experience):
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
         else:
-            # Fallback to master bullets
+            # Fallback to master bullets from your CV
             master_bullets = {
                 "Chief of Staff (Feb 2023-To Date)": [
-                    "Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure strategic alignment with the State Development Plan.",
-                    "Represented the President at national and regional forums, managing relationships with international donors (USAID, EU, UN), diplomatic missions, and development partners.",
-                    "Spearheaded emergency response efforts during political and humanitarian crises, ensuring coordinated resource allocation and stakeholder communication.",
-                    "Mobilized donor funding and cultivated strategic partnerships with international NGOs and UN agencies to support governance and service delivery."
+                    "Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners to secure funding for state priorities and emergency response.",
+                    "Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations to enhance governance, humanitarian response, and service delivery.",
+                    "Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure alignment with the State Development Plan.",
+                    "Program Growth & Strategy: Led the development and implementation of the comprehensive State Development Plan, translating high-level goals into actionable programs and policies.",
+                    "Stakeholder Management: Represented the President at national and regional forums, managing complex relationships and ensuring aligned engagement across all partners.",
+                    "Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.",
+                    "Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery."
                 ],
                 "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": [
-                    "Led humanitarian and development needs assessments to inform strategic planning and funding proposals for international donors.",
-                    "Managed a portfolio of donor-funded programs, monitoring deliverables, budgets, and compliance.",
-                    "Established partnerships with UN agencies, NGOs, and civil society organizations to foster collaboration.",
-                    "Conducted political, economic, and social analysis to provide data-driven insights for ministry strategy."
+                    "Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.",
+                    "Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.",
+                    "Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development to align Ministry initiatives with national and regional priorities.",
+                    "External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.",
+                    "Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making."
                 ],
                 "Chief Operations Officer | Jul 2016 -- Jul 2021": [
-                    "Directed all operational functions including budgeting, strategic planning, and resource allocation.",
-                    "Led business development initiatives, expanding into new regions and securing funding for microenterprise programs.",
-                    "Established strategic partnerships with international development organizations to enhance program impact.",
-                    "Represented the organization to government agencies, donors, and partners."
+                    "Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.",
+                    "Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.",
+                    "Partnership Management: Established and maintained strategic partnerships with international development organizations to enhance program impact and sustainability.",
+                    "Community Engagement: Managed community relations, contributing to peacebuilding and social development through economic empowerment and locally-led programming.",
+                    "Stakeholder Relations: Represented the organization to government agencies, donors, and partners, ensuring effective communication and stakeholder management."
                 ]
             }
             for bullet in master_bullets.get(job_title, []):
@@ -317,7 +355,6 @@ def create_tailored_docx(new_summary, new_experience):
     edu_header.runs[0].font.size = Pt(12)
     edu_header.runs[0].bold = True
     
-    # Education from original
     education = [
         "Micro Masters. Database management System",
         "University of Baltimore Maryland",
