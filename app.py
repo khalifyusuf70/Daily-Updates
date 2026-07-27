@@ -29,7 +29,7 @@ client = OpenAI(
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# MASTER CV TEMPLATE
+# MASTER CV TEMPLATE - WITH EXACT JOB TITLES
 # ---------------------------
 MASTER_CV_TEMPLATE = """
 +252611385559/+254715244144
@@ -56,7 +56,7 @@ Jubaland State of Somalia
 - Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.
 - Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery.
 
-Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023
+Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)
 Ministry of Planning, Jubaland State, Somalia
 - Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.
 - Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.
@@ -64,7 +64,7 @@ Ministry of Planning, Jubaland State, Somalia
 - External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.
 - Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making.
 
-Chief Operations Officer | Jul 2016 -- Jul 2021
+Chief Operations Officer (Jul 2016 – Jul 2021)
 KIMS MICROFINANCE, Somalia
 - Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.
 - Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.
@@ -97,6 +97,21 @@ omarabdi2@gmail.com
 """
 
 # ---------------------------
+# EXACT JOB TITLES FOR AI PROMPT
+# ---------------------------
+JOB_TITLES = [
+    "Chief of Staff (Feb 2023-To Date)",
+    "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)",
+    "Chief Operations Officer (Jul 2016 – Jul 2021)"
+]
+
+COMPANY_NAMES = {
+    "Chief of Staff (Feb 2023-To Date)": "Jubaland State of Somalia",
+    "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": "Ministry of Planning, Jubaland State, Somalia",
+    "Chief Operations Officer (Jul 2016 – Jul 2021)": "KIMS MICROFINANCE, Somalia"
+}
+
+# ---------------------------
 # AI PROMPTS
 # ---------------------------
 SYSTEM_PROMPT = """
@@ -114,6 +129,14 @@ Rules:
 """
 
 def build_user_prompt(cv_text, job_description):
+    # Build experience template with exact job titles
+    exp_template = {}
+    for title in JOB_TITLES:
+        exp_template[title] = ["bullet 1", "bullet 2", "bullet 3"]
+    
+    titles_json = json.dumps(JOB_TITLES, indent=2)
+    exp_json = json.dumps(exp_template, indent=2)
+    
     return f"""
 MASTER CV
 {cv_text}
@@ -127,14 +150,13 @@ Tasks:
 3. Add relevant ATS keywords where appropriate.
 4. Do not fabricate any experience.
 
+CRITICAL: Use EXACTLY these job titles as keys (copy them exactly):
+{titles_json}
+
 Return JSON in this format:
 {{
     "summary": "your new summary here",
-    "experience": {{
-        "Chief of Staff (Feb 2023-To Date)": ["bullet 1", "bullet 2", "bullet 3"],
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": ["bullet 1", "bullet 2"],
-        "Chief Operations Officer | Jul 2016 -- Jul 2021": ["bullet 1", "bullet 2"]
-    }}
+    "experience": {exp_json}
 }}
 """
 
@@ -157,11 +179,9 @@ def call_ai(cv_text, job_description):
         print(f"📥 Raw response length: {len(raw_response)}")
         print(f"📥 Raw response preview: {raw_response[:500]}...")
         
-        # Try to parse JSON
         result = json.loads(raw_response)
         print(f"✅ Parsed JSON keys: {result.keys()}")
         
-        # Validate the response has the expected keys
         if 'summary' not in result:
             print("⚠️ 'summary' key missing in response")
             result['summary'] = "Summary not provided by AI"
@@ -175,7 +195,6 @@ def call_ai(cv_text, job_description):
     except json.JSONDecodeError as e:
         print(f"❌ JSON parse error: {str(e)}")
         print(f"Raw response: {raw_response}")
-        # Return a fallback response
         return {
             'summary': 'Error parsing AI response. Please try again.',
             'experience': {}
@@ -299,43 +318,54 @@ def create_tailored_docx(new_summary, new_experience):
     
     doc.add_paragraph("")
     
-    # Experience
+    # Experience - Using exact job titles
     exp_header = doc.add_paragraph("# Experience")
     exp_header.runs[0].font.name = 'Calibri'
     exp_header.runs[0].font.size = Pt(12)
     exp_header.runs[0].bold = True
     
-    JOB_ORDER = [
-        "Chief of Staff (Feb 2023-To Date)",
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023",
-        "Chief Operations Officer | Jul 2016 -- Jul 2021"
-    ]
-    
-    companies = {
-        "Chief of Staff (Feb 2023-To Date)": "Jubaland State of Somalia",
-        "Senior Advisor -- Projects Planning & Grants Development | Aug 2021 -- Jan 2023": "Ministry of Planning, Jubaland State, Somalia",
-        "Chief Operations Officer | Jul 2016 -- Jul 2021": "KIMS MICROFINANCE, Somalia"
-    }
-    
-    for job_title in JOB_ORDER:
+    for job_title in JOB_TITLES:
+        # Job Title - Segoe UI 12 Bold
         job_para = doc.add_paragraph(job_title)
         job_para.runs[0].font.name = 'Segoe UI'
         job_para.runs[0].font.size = Pt(12)
         job_para.runs[0].bold = True
         
-        company_para = doc.add_paragraph(companies.get(job_title, ""))
+        # Company - Segoe UI 12 Italic
+        company_para = doc.add_paragraph(COMPANY_NAMES.get(job_title, ""))
         company_para.runs[0].font.name = 'Segoe UI'
         company_para.runs[0].font.size = Pt(12)
         company_para.runs[0].italic = True
         
+        # Bullets
         if job_title in new_experience and new_experience[job_title]:
             for bullet in new_experience[job_title]:
                 bullet_para = doc.add_paragraph(f"• {bullet}")
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
         else:
-            # Fallback bullets
-            doc.add_paragraph("• Experience details not available")
+            # Fallback bullets from master
+            fallback_bullets = {
+                "Chief of Staff (Feb 2023-To Date)": [
+                    "Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners.",
+                    "Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations.",
+                    "Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies."
+                ],
+                "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
+                    "Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs.",
+                    "Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas.",
+                    "Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development."
+                ],
+                "Chief Operations Officer (Jul 2016 – Jul 2021)": [
+                    "Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation.",
+                    "Business Development: Led business development initiatives, expanding the organization's reach into new regions.",
+                    "Partnership Management: Established and maintained strategic partnerships with international development organizations."
+                ]
+            }
+            for bullet in fallback_bullets.get(job_title, []):
+                bullet_para = doc.add_paragraph(f"• {bullet}")
+                bullet_para.runs[0].font.name = 'Calibri'
+                bullet_para.runs[0].font.size = Pt(12)
         
         doc.add_paragraph("")
     
