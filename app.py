@@ -75,103 +75,84 @@ COMPANY_NAMES = {
 }
 
 # ---------------------------
-# PROFESSIONAL-GRADE AI PROMPTS
+# IMPROVED PROMPTS WITH EXPLICIT MAPPING
 # ---------------------------
 SYSTEM_PROMPT = """
-You are one of the world's leading Executive Resume Writers, Executive Recruiters, ATS Optimization Specialists, and Career Strategists.
+You are an expert Executive Resume Writer for international humanitarian organizations (UN, IRC, NRC, Mercy Corps, Save the Children, etc.).
 
-Your task is to tailor a candidate's CV and cover letter to maximize alignment with a target job description while maintaining complete honesty and factual accuracy.
+Your task is to rewrite CV bullet points so that EVERY bullet explicitly connects the candidate's experience to the job requirements.
 
-Your objectives are to:
-• Increase ATS match score.
-• Highlight the candidate's most relevant experience.
-• Rewrite experience using stronger executive language.
-• Reorder emphasis toward the employer's priorities.
-• Naturally incorporate keywords from the job description.
-• Make the candidate appear as competitive as possible without inventing experience.
+CRITICAL RULES:
+1. NEVER invent experience, achievements, or qualifications.
+2. For EACH bullet, EXPLICITLY show how the experience maps to a specific job requirement.
+3. Use phrases like: "directly aligned with", "parallel to", "mirrors", "equivalent to", "relevant to", "similar to", "matching".
+4. Use EXACT keywords from the job description.
+5. Show the hiring manager exactly WHY this experience matters for the role.
+6. Keep 6-7 bullet points per job.
+7. Think: "What does the employer need? How does my experience directly address that?"
 
-Rules:
-1. Never fabricate employers, job titles, education, certifications, projects, publications, grants, budgets, teams, countries, or achievements.
-
-2. You may rewrite, reorganize, strengthen, and expand existing responsibilities if they remain truthful.
-
-3. Use language commonly found in international organizations such as UN, IRC, NRC, Action Against Hunger, Mercy Corps, World Vision, Save the Children, IFRC, Danish Refugee Council, Norwegian People's Aid, CARE, and USAID.
-
-4. Think like a hiring manager rather than simply matching keywords.
-
-5. Optimize for ATS but avoid keyword stuffing.
-
-6. Rewrite the Professional Summary specifically for the advertised role.
-
-7. Rewrite every bullet under every position so that it reflects the priorities of the job description.
-
-8. Replace weak verbs with stronger leadership verbs.
-
-9. Add missing competencies only if they are reasonably supported by the candidate's experience.
-
-10. Produce a professional executive CV suitable for Director-level international NGO positions.
+Example mapping patterns:
+- If JD says "Design and deliver training" → "Designed and delivered training on [X], directly aligning with the need to train researchers on SOPs"
+- If JD says "SOP compliance monitoring" → "Monitored compliance with [Y], similar to the SOP compliance monitoring required for this role"
+- If JD says "IRB submissions" → "Managed [Z] submission processes, parallel to managing IRB submissions"
+- If JD says "Maintain audit-ready records" → "Maintained comprehensive records for [X], mirroring the audit-ready documentation required for IRB protocols"
+- If JD says "Coordinate review meetings" → "Coordinated [Y] meetings with multiple stakeholders, equivalent to coordinating IRB review meetings"
 
 Return ONLY valid JSON.
 """
 
 def build_user_prompt(cv_text, job_description):
     return f"""
-MASTER CV:
+MASTER CV (candidate's actual experience):
 {cv_text}
 
-JOB DESCRIPTION:
+JOB DESCRIPTION (what the employer needs):
 {job_description}
 
-Carefully analyze both documents.
+TASK:
+Rewrite the CV so that EVERY bullet point EXPLICITLY connects the candidate's experience to a specific job requirement.
 
-Before rewriting the CV:
-1. Identify the 15-25 most important ATS keywords.
-2. Identify the top 10 competencies the employer is seeking.
-3. Identify the leadership level expected.
-4. Identify the likely hiring manager's priorities.
-5. Identify the biggest gaps between my CV and the role.
+RULES:
+1. Keep 6-7 bullet points per job.
+2. Use mapping phrases: "directly aligned with", "parallel to", "mirrors", "equivalent to", "relevant to", "similar to".
+3. Use keywords from the job description.
+4. Show WHY each experience matters for this role.
+5. Never invent experience.
 
-Then tailor my CV specifically for this position.
+EXAMPLE of what a bullet should look like:
+"Led needs assessments using quantitative and qualitative research methodologies, directly aligned with designing and delivering training for researchers on data collection SOPs."
 
-Your tasks are:
-1. Rewrite the Professional Summary (4-6 sentences).
-2. Rewrite every job description under every employer (6-7 bullet points per job).
-3. Highlight experience most relevant to this role.
-4. Naturally incorporate ATS keywords.
-5. Emphasize transferable skills where direct experience is limited.
-6. Remove emphasis on experiences that are less relevant.
-7. Maintain complete factual accuracy.
-8. Use concise executive-level language.
-9. Produce a CV that would realistically compete for an interview for this specific role.
+Another example:
+"Coordinated cross-ministerial monitoring and reporting, similar to the SOP compliance monitoring and quarterly reporting required for this role."
 
-Return JSON in this format:
+Return JSON:
 {{
-    "summary": "Professional Summary here",
+    "summary": "4-6 sentence summary that explicitly connects the candidate to the role",
     "experience": {{
         "Chief of Staff (Feb 2023-To Date)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6",
-            "bullet 7"
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement"
         ],
         "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6"
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping"
         ],
         "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6"
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping"
         ]
     }}
 }}
@@ -185,18 +166,14 @@ MASTER CV:
 JOB DESCRIPTION:
 {job_description}
 
-Write a one-page cover letter specifically tailored to this position.
+Write a 3-paragraph cover letter that:
+1. Opens with enthusiasm and explicitly states why the candidate is a great fit.
+2. In each bullet under experience, EXPLICITLY connects the candidate's experience to the job requirements.
+3. Uses phrases like "directly aligned with", "parallel to", "mirrors", "equivalent to".
+4. Demonstrates understanding of the organization's mission.
+5. Is persuasive and authentic.
+6. Avoids generic phrases.
 
-The cover letter should:
-• Explain why the candidate is an excellent fit.
-• Connect previous experience to the advertised role.
-• Demonstrate knowledge of the organization's mission.
-• Highlight transferable experience.
-• Sound natural and authentic.
-• Avoid generic AI phrases.
-• Be persuasive enough that a hiring manager would be interested in interviewing the candidate.
-
-Do not invent qualifications or achievements.
 Return ONLY the cover letter text.
 """
 
@@ -235,13 +212,13 @@ def call_ai(cv_text, job_description):
         }
 
 def tailor_cover_letter(cv_text, job_description):
-    """Generate tailored cover letter"""
+    """Generate tailored cover letter with explicit mapping"""
     try:
         print("✍️ Generating cover letter...")
         response = client.chat.completions.create(
             model="deepseek-v4-flash",
             messages=[
-                {"role": "system", "content": "You are an expert cover letter writer for international organizations."},
+                {"role": "system", "content": "You are an expert cover letter writer for international organizations. Every sentence should connect the candidate's experience to the job requirements."},
                 {"role": "user", "content": build_cover_letter_prompt(cv_text, job_description)}
             ],
             temperature=0.3,
@@ -361,28 +338,28 @@ def create_tailored_docx(new_summary, new_experience):
             # Fallback bullets
             fallback_bullets = {
                 "Chief of Staff (Feb 2023-To Date)": [
-                    "Led strategic coordination across 15 government ministries, driving alignment with state development priorities.",
-                    "Managed stakeholder relationships with international donors and NGOs, ensuring collaborative program delivery.",
-                    "Developed and implemented strategic plans, translating high-level goals into actionable programs.",
-                    "Oversaw program monitoring and reporting, ensuring compliance with government and donor requirements.",
-                    "Provided crisis management and emergency response coordination under pressure.",
-                    "Facilitated resource mobilization and partnership building, strengthening institutional capacity."
+                    "Led strategic coordination across 15 government ministries, directly aligned with coordinating research teams and cross-pillar collaboration.",
+                    "Managed stakeholder relationships with international donors and NGOs, parallel to managing relationships with IRB and research leads.",
+                    "Developed and implemented strategic plans, mirroring the development of SOPs and guidance materials.",
+                    "Oversaw program monitoring and reporting, equivalent to supporting quarterly compliance monitoring.",
+                    "Provided crisis management and emergency response coordination, similar to managing regulatory compliance and risk.",
+                    "Facilitated resource mobilization and partnership building, relevant to organizing Research Community of Practice."
                 ],
                 "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-                    "Led humanitarian needs assessments using mixed-method research, informing strategic planning and funding proposals.",
-                    "Managed donor-funded programs, ensuring financial accountability and compliance with grant agreements.",
-                    "Conducted political, economic, and social analysis, providing data-driven insights for policy decisions.",
-                    "Established partnerships with UN agencies and NGOs, strengthening civil society and peacebuilding initiatives.",
-                    "Strengthened institutional capacity through training and technical support to ministry staff.",
-                    "Developed monitoring frameworks and reporting systems, improving program effectiveness."
+                    "Led humanitarian needs assessments using research methodologies, directly aligned with designing training for researchers on data collection SOPs.",
+                    "Managed donor-funded programs with strict compliance, parallel to maintaining research forms and templates for SOP compliance.",
+                    "Conducted analysis and reporting for policy decisions, mirroring the analytical reporting required for IRB and research governance.",
+                    "Established partnerships with UN agencies and NGOs, similar to organizing and coordinating Research Pillar-wide meetings.",
+                    "Strengthened institutional capacity through training, directly matching the need to deliver training for researchers on SOPs.",
+                    "Developed monitoring frameworks and reporting systems, equivalent to supporting quarterly compliance monitoring across the research portfolio."
                 ],
                 "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-                    "Directed operational functions including budgeting, strategic planning, and resource allocation.",
-                    "Led business development initiatives, expanding operations and securing funding for vulnerable populations.",
-                    "Established strategic partnerships with international organizations, enhancing program sustainability.",
-                    "Managed community engagement and stakeholder relations, contributing to social development.",
-                    "Oversaw compliance, financial management, and reporting, ensuring accountability.",
-                    "Built and led high-performing teams, fostering a culture of continuous improvement."
+                    "Directed operational functions including budgeting and planning, relevant to operating and maintaining AI-enabled research tools.",
+                    "Led business development and market expansion, similar to piloting AI tools with research teams and developing guidance.",
+                    "Established strategic partnerships, akin to coordinating cross-team knowledge exchange and the Research Community of Practice.",
+                    "Managed stakeholder relations, relevant to organizing Research Pillar-wide meetings and managing IRB relationships.",
+                    "Oversaw compliance and reporting, directly supporting SOP compliance monitoring.",
+                    "Built and led teams, comparable to facilitating communities of practice and coordinating Data Champions."
                 ]
             }
             for bullet in fallback_bullets.get(job_title, []):
@@ -450,7 +427,7 @@ def process_application(job_description):
     print(f"📄 CV text length: {len(cv_text)}")
     
     try:
-        print("🤖 Tailoring CV with professional prompt...")
+        print("🤖 Tailoring CV with explicit mapping...")
         result = call_ai(cv_text, job_description)
         
         tailored_summary = result.get('summary', '')
