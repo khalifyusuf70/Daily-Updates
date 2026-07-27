@@ -148,7 +148,8 @@ def call_ai(cv_text, job_description):
                 {"role": "user", "content": build_user_prompt(cv_text, job_description)},
             ],
             temperature=0.2,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"},
+            timeout=60.0  # 60 second timeout
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
@@ -179,7 +180,8 @@ Return ONLY the cover letter text.
                 {"role": "system", "content": "You are an expert cover letter writer. Return only the cover letter text."},
                 {"role": "user", "content": prompt}
             ],
-            temperature=0.3
+            temperature=0.3,
+            timeout=60.0  # 60 second timeout
         )
         return response.choices[0].message.content
     except Exception as e:
