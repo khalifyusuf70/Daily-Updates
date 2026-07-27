@@ -29,26 +29,34 @@ client = OpenAI(
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# MASTER CV TEMPLATE - SHORTER VERSION FOR SPEED
+# MASTER CV TEMPLATE - WITH ALL BULLETS
 # ---------------------------
 MASTER_CV_TEMPLATE = """
 Chief of Staff (Feb 2023-To Date) | Jubaland State of Somalia
-- Led resource mobilization with international donors (USAID, EU, UN)
-- Directed Office of the President across 15 government ministries
-- Developed and implemented State Development Plan
-- Managed crisis response and humanitarian coordination
+- Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners to secure funding for state priorities and emergency response.
+- Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations to enhance governance, humanitarian response, and service delivery.
+- Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure alignment with the State Development Plan.
+- Program Growth & Strategy: Led the development and implementation of the comprehensive State Development Plan, translating high-level goals into actionable programs and policies.
+- Stakeholder Management: Represented the President at national and regional forums, managing complex relationships and ensuring aligned engagement across all partners.
+- Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.
+- Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery.
 
 Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023) | Ministry of Planning, Jubaland State, Somalia
-- Led grant acquisition and donor-funded program management
-- Conducted needs assessments and developed funding proposals
-- Provided strategic policy advice to Minister
-- Established partnerships with UN agencies and NGOs
+- Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.
+- Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.
+- Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development to align Ministry initiatives with national and regional priorities.
+- External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.
+- Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making.
+- Capacity Building: Strengthened institutional capacity through training and technical support to ministry staff and partners.
 
 Chief Operations Officer (Jul 2016 – Jul 2021) | KIMS MICROFINANCE, Somalia
-- Directed operations, budgeting, and strategic planning
-- Led business development and market expansion
-- Managed strategic partnerships
-- Oversaw community engagement and stakeholder relations
+- Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.
+- Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.
+- Partnership Management: Established and maintained strategic partnerships with international development organizations to enhance program impact and sustainability.
+- Community Engagement: Managed community relations, contributing to peacebuilding and social development through economic empowerment and locally-led programming.
+- Stakeholder Relations: Represented the organization to government agencies, donors, and partners, ensuring effective communication and stakeholder management.
+- Financial Oversight: Oversaw financial management, compliance, and reporting to ensure transparency and accountability.
+- Team Leadership: Built and led high-performing teams, fostering a culture of excellence and continuous improvement.
 """
 
 # ---------------------------
@@ -66,12 +74,43 @@ COMPANY_NAMES = {
     "Chief Operations Officer (Jul 2016 – Jul 2021)": "KIMS MICROFINANCE, Somalia"
 }
 
+# Fallback bullets (6-7 per job)
+FALLBACK_BULLETS = {
+    "Chief of Staff (Feb 2023-To Date)": [
+        "Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners to secure funding for state priorities and emergency response.",
+        "Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations to enhance governance, humanitarian response, and service delivery.",
+        "Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure alignment with the State Development Plan.",
+        "Program Growth & Strategy: Led the development and implementation of the comprehensive State Development Plan, translating high-level goals into actionable programs and policies.",
+        "Stakeholder Management: Represented the President at national and regional forums, managing complex relationships and ensuring aligned engagement across all partners.",
+        "Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.",
+        "Partnership Building: Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery."
+    ],
+    "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
+        "Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.",
+        "Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.",
+        "Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development to align Ministry initiatives with national and regional priorities.",
+        "External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.",
+        "Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making.",
+        "Capacity Building: Strengthened institutional capacity through training and technical support to ministry staff and partners."
+    ],
+    "Chief Operations Officer (Jul 2016 – Jul 2021)": [
+        "Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.",
+        "Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.",
+        "Partnership Management: Established and maintained strategic partnerships with international development organizations to enhance program impact and sustainability.",
+        "Community Engagement: Managed community relations, contributing to peacebuilding and social development through economic empowerment and locally-led programming.",
+        "Stakeholder Relations: Represented the organization to government agencies, donors, and partners, ensuring effective communication and stakeholder management.",
+        "Financial Oversight: Oversaw financial management, compliance, and reporting to ensure transparency and accountability.",
+        "Team Leadership: Built and led high-performing teams, fostering a culture of excellence and continuous improvement."
+    ]
+}
+
 # ---------------------------
-# FAST AI PROMPTS - OPTIMIZED FOR SPEED
+# FAST AI PROMPTS
 # ---------------------------
 SYSTEM_PROMPT = """
 You are a resume expert. Tailor CV to job description. Be concise.
 Rules: Never invent experience. Rewrite bullets to match job keywords. Return only JSON.
+Keep 6-7 bullet points per job.
 """
 
 def build_user_prompt(cv_text, job_description):
@@ -80,7 +119,7 @@ CV: {cv_text}
 JD: {job_description[:1500]}
 
 Return JSON:
-{{"summary":"4-6 sentences","experience":{{"Chief of Staff (Feb 2023-To Date)":["bullet1","bullet2","bullet3"],"Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)":["bullet1","bullet2"],"Chief Operations Officer (Jul 2016 – Jul 2021)":["bullet1","bullet2"]}}}}
+{{"summary":"4-6 sentences","experience":{{"Chief of Staff (Feb 2023-To Date)":["bullet1","bullet2","bullet3","bullet4","bullet5","bullet6"],"Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)":["bullet1","bullet2","bullet3","bullet4","bullet5"],"Chief Operations Officer (Jul 2016 – Jul 2021)":["bullet1","bullet2","bullet3","bullet4","bullet5","bullet6"]}}}}
 """
 
 def call_ai(cv_text, job_description):
@@ -88,14 +127,14 @@ def call_ai(cv_text, job_description):
     try:
         print("📤 Sending request to DeepSeek API...")
         response = client.chat.completions.create(
-            model="deepseek-v4-flash",  # FASTER model
+            model="deepseek-v4-flash",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(cv_text, job_description[:1500])},
             ],
             temperature=0.2,
             response_format={"type": "json_object"},
-            timeout=30.0  # 30 second timeout
+            timeout=30.0
         )
         
         raw_response = response.choices[0].message.content
@@ -126,7 +165,7 @@ Write 3 short paragraphs for cover letter.
 """
     try:
         response = client.chat.completions.create(
-            model="deepseek-v4-flash",  # FASTER
+            model="deepseek-v4-flash",
             messages=[
                 {"role": "system", "content": "Write a concise 3-paragraph cover letter."},
                 {"role": "user", "content": prompt}
@@ -153,7 +192,7 @@ def read_docx(file_path):
         return ""
 
 def create_tailored_docx(new_summary, new_experience):
-    """Create tailored CV"""
+    """Create tailored CV with skills section and 6-7 bullets per job"""
     doc = Document()
     
     style = doc.styles['Normal']
@@ -166,7 +205,7 @@ def create_tailored_docx(new_summary, new_experience):
     doc.add_paragraph("khalifyusuf@agileanalytica.com")
     doc.add_paragraph("")
     
-    # Summary
+    # ========== SUMMARY ==========
     summary_header = doc.add_paragraph("# Summary")
     summary_header.runs[0].font.name = 'Calibri'
     summary_header.runs[0].font.size = Pt(12)
@@ -178,7 +217,7 @@ def create_tailored_docx(new_summary, new_experience):
         summary_para.runs[0].font.size = Pt(12)
     doc.add_paragraph("")
     
-    # Skills
+    # ========== SKILLS HIGHLIGHTS ==========
     skills_header = doc.add_paragraph("# Skill Highlights")
     skills_header.runs[0].font.name = 'Calibri'
     skills_header.runs[0].font.size = Pt(12)
@@ -219,54 +258,41 @@ def create_tailored_docx(new_summary, new_experience):
     
     doc.add_paragraph("")
     
-    # Experience
+    # ========== EXPERIENCE ==========
     exp_header = doc.add_paragraph("# Experience")
     exp_header.runs[0].font.name = 'Calibri'
     exp_header.runs[0].font.size = Pt(12)
     exp_header.runs[0].bold = True
     
     for job_title in JOB_TITLES:
+        # Job Title - Segoe UI 12 Bold
         job_para = doc.add_paragraph(job_title)
         job_para.runs[0].font.name = 'Segoe UI'
         job_para.runs[0].font.size = Pt(12)
         job_para.runs[0].bold = True
         
+        # Company - Segoe UI 12 Italic
         company_para = doc.add_paragraph(COMPANY_NAMES.get(job_title, ""))
         company_para.runs[0].font.name = 'Segoe UI'
         company_para.runs[0].font.size = Pt(12)
         company_para.runs[0].italic = True
         
+        # Bullets - Use AI if available, otherwise fallback
         if job_title in new_experience and new_experience[job_title]:
             for bullet in new_experience[job_title]:
                 bullet_para = doc.add_paragraph(f"• {bullet}")
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
         else:
-            fallback_bullets = {
-                "Chief of Staff (Feb 2023-To Date)": [
-                    "Led resource mobilization with international donors (USAID, EU, UN)",
-                    "Directed Office of the President across 15 government ministries",
-                    "Developed and implemented State Development Plan"
-                ],
-                "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-                    "Led grant acquisition and donor-funded program management",
-                    "Conducted needs assessments and developed funding proposals",
-                    "Provided strategic policy advice to Minister"
-                ],
-                "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-                    "Directed operations, budgeting, and strategic planning",
-                    "Led business development and market expansion",
-                    "Managed strategic partnerships"
-                ]
-            }
-            for bullet in fallback_bullets.get(job_title, []):
+            # Use fallback bullets (6-7 per job)
+            for bullet in FALLBACK_BULLETS.get(job_title, []):
                 bullet_para = doc.add_paragraph(f"• {bullet}")
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
         
         doc.add_paragraph("")
     
-    # Education
+    # ========== EDUCATION ==========
     edu_header = doc.add_paragraph("# Education")
     edu_header.runs[0].font.name = 'Calibri'
     edu_header.runs[0].font.size = Pt(12)
@@ -286,7 +312,7 @@ def create_tailored_docx(new_summary, new_experience):
     
     doc.add_paragraph("")
     
-    # Referees
+    # ========== REFEREES ==========
     ref_header = doc.add_paragraph("# REFREES")
     ref_header.runs[0].font.name = 'Calibri'
     ref_header.runs[0].font.size = Pt(12)
@@ -317,7 +343,7 @@ def create_tailored_docx(new_summary, new_experience):
 # MAIN PROCESSING
 # ---------------------------
 def process_application(job_description):
-    """Process the entire application tailoring - FAST"""
+    """Process the entire application tailoring"""
     
     cv_text = MASTER_CV_TEMPLATE
     
