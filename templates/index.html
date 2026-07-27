@@ -30,11 +30,6 @@
             color: #666;
             margin-bottom: 30px;
         }
-        .row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
         .form-group {
             margin-bottom: 20px;
         }
@@ -52,7 +47,7 @@
             font-size: 14px;
             font-family: inherit;
             resize: vertical;
-            min-height: 300px;
+            min-height: 200px;
             transition: border-color 0.3s;
         }
         .form-group textarea:focus {
@@ -71,13 +66,8 @@
             cursor: pointer;
             transition: transform 0.2s;
         }
-        .btn:hover {
-            transform: translateY(-2px);
-        }
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
         .loading {
             display: none;
             text-align: center;
@@ -134,59 +124,44 @@
             margin-top: 10px;
             font-size: 12px;
         }
-        .copy-btn:hover {
-            background: #5a67d8;
-        }
-        .copy-btn.copied {
-            background: #4CAF50;
-        }
+        .copy-btn:hover { background: #5a67d8; }
+        .copy-btn.copied { background: #4CAF50; }
         .job-title {
             font-weight: 700;
             color: #333;
             margin: 10px 0 5px 0;
         }
+        .error-msg {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            display: none;
+        }
         @media (max-width: 768px) {
-            .row {
-                grid-template-columns: 1fr;
-            }
-            .container {
-                padding: 20px;
-            }
+            .container { padding: 20px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>📄 CV & Cover Letter Tailor</h1>
-        <p class="subtitle">Paste your experience and a job description to get tailored content</p>
+        <p class="subtitle">Paste a job description to get tailored CV and cover letter</p>
+
+        <div class="error-msg" id="errorMsg">❌ Network error. Please try again.</div>
 
         <form id="tailorForm">
-            <div class="row">
-                <div class="form-group">
-                    <label for="experience">📋 Your Experience</label>
-                    <textarea id="experience" name="experience" placeholder="Paste your experience here. Format each job as:
-
-Chief of Staff | Jubaland State | Feb 2023 - To Date
-- Led resource mobilization efforts...
-- Managed strategic partnerships...
-- Coordinated across 15 ministries...
-
-Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
-- Led grant acquisition...
-- Developed strategic plans...
-- Established partnerships..." required></textarea>
-                </div>
-                <div class="form-group">
-                    <label for="jobDescription">🎯 Job Description</label>
-                    <textarea id="jobDescription" name="job_description" placeholder="Paste the complete job description here..." required></textarea>
-                </div>
+            <div class="form-group">
+                <label for="jobDescription">🎯 Job Description</label>
+                <textarea id="jobDescription" name="job_description" placeholder="Paste the complete job description from LinkedIn or any job board..." required></textarea>
             </div>
             <button type="submit" class="btn" id="submitBtn">🚀 Generate Tailored Content</button>
         </form>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p style="margin-top: 15px; color: #666;">🤖 AI is generating your tailored content... This takes 10-20 seconds</p>
+            <p style="margin-top: 15px; color: #666;">🤖 AI is generating your tailored content... This takes 15-25 seconds</p>
         </div>
 
         <div class="result" id="result">
@@ -209,6 +184,12 @@ Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
                 <div class="content" id="coverLetterContent"></div>
                 <button class="copy-btn" onclick="copyContent('coverLetterContent')">📋 Copy</button>
             </div>
+
+            <div style="text-align: center; margin-top: 20px;">
+                <p style="color: #666; font-size: 14px;">
+                    📥 To download as Word documents, use the download buttons in the app.
+                </p>
+            </div>
         </div>
     </div>
 
@@ -216,11 +197,12 @@ Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
         document.getElementById('tailorForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const experience = document.getElementById('experience').value.trim();
             const jobDescription = document.getElementById('jobDescription').value.trim();
+            const errorMsg = document.getElementById('errorMsg');
+            errorMsg.style.display = 'none';
             
-            if (!experience || !jobDescription) {
-                alert('Please provide both your experience and the job description.');
+            if (!jobDescription) {
+                alert('Please paste a job description first!');
                 return;
             }
 
@@ -232,40 +214,52 @@ Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
             try {
                 const response = await fetch('/tailor', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    headers: { 
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'application/json'
+                    },
                     body: new URLSearchParams({
-                        experience: experience,
                         job_description: jobDescription
-                    })
+                    }),
+                    timeout: 60000  // 60 second timeout
                 });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Server error');
+                }
 
                 const data = await response.json();
 
                 if (data.success) {
                     // Display summary
-                    document.getElementById('summaryContent').textContent = data.summary;
+                    document.getElementById('summaryContent').textContent = data.summary || 'No summary generated';
                     
                     // Display experience with formatting
                     let expHtml = '';
-                    for (const [job, bullets] of Object.entries(data.experience)) {
+                    for (const [job, bullets] of Object.entries(data.experience || {})) {
                         expHtml += `<div class="job-title">${job}</div>`;
-                        bullets.forEach(bullet => {
-                            expHtml += `<div class="bullet">• ${bullet}</div>`;
-                        });
+                        if (Array.isArray(bullets)) {
+                            bullets.forEach(bullet => {
+                                expHtml += `<div class="bullet">• ${bullet}</div>`;
+                            });
+                        }
                         expHtml += '<br>';
                     }
-                    document.getElementById('experienceContent').innerHTML = expHtml;
+                    document.getElementById('experienceContent').innerHTML = expHtml || 'No experience data';
                     
                     // Display cover letter
-                    document.getElementById('coverLetterContent').textContent = data.cover_letter;
+                    document.getElementById('coverLetterContent').textContent = data.cover_letter || 'No cover letter generated';
                     
                     document.getElementById('result').style.display = 'block';
                 } else {
-                    alert('Error: ' + data.error);
+                    errorMsg.textContent = '❌ Error: ' + (data.error || 'Unknown error');
+                    errorMsg.style.display = 'block';
                 }
             } catch (error) {
-                alert('Network error. Please try again.');
-                console.error(error);
+                console.error('Error:', error);
+                errorMsg.textContent = '❌ Network error: ' + (error.message || 'Please try again');
+                errorMsg.style.display = 'block';
             } finally {
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('submitBtn').disabled = false;
@@ -284,12 +278,15 @@ Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
                 let result = '';
                 jobTitles.forEach((title, index) => {
                     result += title.textContent + '\n';
-                    const bullets = element.querySelectorAll('.bullet');
-                    // Get bullets for this job (need to track which bullets belong to which job)
-                    // Simple approach: get all bullets after this job title until next job title
+                    // Get bullets for this job
+                    const startIdx = index * 10; // approximate
+                    const endIdx = startIdx + 10;
+                    for (let i = startIdx; i < endIdx && i < items.length; i++) {
+                        result += items[i].textContent + '\n';
+                    }
+                    result += '\n';
                 });
-                // Simpler: just get text content
-                text = element.textContent;
+                text = result;
             } else {
                 text = element.textContent;
             }
@@ -302,6 +299,9 @@ Senior Advisor | Ministry of Planning | Aug 2021 - Jan 2023
                     btn.textContent = '📋 Copy';
                     btn.classList.remove('copied');
                 }, 2000);
+            }).catch(() => {
+                // Fallback for non-HTTPS
+                alert('Copy to clipboard failed. Please select and copy manually.');
             });
         }
     </script>
