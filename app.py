@@ -29,7 +29,7 @@ client = OpenAI(
 COVER_PATH = "Cover_Template.docx"
 
 # ---------------------------
-# MASTER CV TEMPLATE - WITH ALL BULLETS
+# MASTER CV TEMPLATE
 # ---------------------------
 MASTER_CV_TEMPLATE = """
 Chief of Staff (Feb 2023-To Date) | Jubaland State of Somalia
@@ -74,67 +74,145 @@ COMPANY_NAMES = {
     "Chief Operations Officer (Jul 2016 – Jul 2021)": "KIMS MICROFINANCE, Somalia"
 }
 
-# Fallback bullets (6-7 per job)
-FALLBACK_BULLETS = {
-    "Chief of Staff (Feb 2023-To Date)": [
-        "Donor Engagement & Fundraising: Led resource mobilization efforts, engaging with international donors (USAID, EU, UN), diplomatic missions, and development partners to secure funding for state priorities and emergency response.",
-        "Strategic Partnership Development: Established and maintained partnerships with international NGOs, UN agencies, and civil society organizations to enhance governance, humanitarian response, and service delivery.",
-        "Strategic Leadership: Directed the Office of the President, coordinating activities across 15 government ministries and agencies to ensure alignment with the State Development Plan.",
-        "Program Growth & Strategy: Led the development and implementation of the comprehensive State Development Plan, translating high-level goals into actionable programs and policies.",
-        "Stakeholder Management: Represented the President at national and regional forums, managing complex relationships and ensuring aligned engagement across all partners.",
-        "Crisis Management: Spearheaded emergency response efforts during political instability and humanitarian crises, coordinating relief activities and resource allocation.",
-        "Partnership Building: Established and maintained partnerships with civil society organizations and community leaders to enhance governance and service delivery."
-    ],
-    "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-        "Grant Acquisition & Management: Led the development of the Ministry's Strategic Plan and managed a portfolio of donor-funded programs, ensuring effective implementation, financial accountability, and compliance.",
-        "Proposal Development: Led humanitarian and development needs assessments, translating findings into priority program areas and successful funding proposals for international donors.",
-        "Strategy & Policy: Provided strategic leadership, advising the Minister on planning, policy, and program development to align Ministry initiatives with national and regional priorities.",
-        "External Relations: Established and maintained partnerships with international development organizations, UN agencies, and NGOs, fostering collaboration on civil society strengthening and peacebuilding initiatives.",
-        "Analytical Reporting: Conducted political, economic, and social analysis to inform Ministry strategy, providing critical data-driven insights for programmatic decision-making.",
-        "Capacity Building: Strengthened institutional capacity through training and technical support to ministry staff and partners."
-    ],
-    "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-        "Organizational Leadership: Directed all operational functions, including budgeting, strategic planning, and resource allocation, to drive organizational development and growth.",
-        "Business Development: Led business development initiatives, expanding the organization's reach into new regions and securing funding for microenterprise programming that supported vulnerable populations.",
-        "Partnership Management: Established and maintained strategic partnerships with international development organizations to enhance program impact and sustainability.",
-        "Community Engagement: Managed community relations, contributing to peacebuilding and social development through economic empowerment and locally-led programming.",
-        "Stakeholder Relations: Represented the organization to government agencies, donors, and partners, ensuring effective communication and stakeholder management.",
-        "Financial Oversight: Oversaw financial management, compliance, and reporting to ensure transparency and accountability.",
-        "Team Leadership: Built and led high-performing teams, fostering a culture of excellence and continuous improvement."
-    ]
-}
-
 # ---------------------------
-# FAST AI PROMPTS
+# PROFESSIONAL-GRADE AI PROMPTS
 # ---------------------------
 SYSTEM_PROMPT = """
-You are a resume expert. Tailor CV to job description. Be concise.
-Rules: Never invent experience. Rewrite bullets to match job keywords. Return only JSON.
-Keep 6-7 bullet points per job.
+You are one of the world's leading Executive Resume Writers, Executive Recruiters, ATS Optimization Specialists, and Career Strategists.
+
+Your task is to tailor a candidate's CV and cover letter to maximize alignment with a target job description while maintaining complete honesty and factual accuracy.
+
+Your objectives are to:
+• Increase ATS match score.
+• Highlight the candidate's most relevant experience.
+• Rewrite experience using stronger executive language.
+• Reorder emphasis toward the employer's priorities.
+• Naturally incorporate keywords from the job description.
+• Make the candidate appear as competitive as possible without inventing experience.
+
+Rules:
+1. Never fabricate employers, job titles, education, certifications, projects, publications, grants, budgets, teams, countries, or achievements.
+
+2. You may rewrite, reorganize, strengthen, and expand existing responsibilities if they remain truthful.
+
+3. Use language commonly found in international organizations such as UN, IRC, NRC, Action Against Hunger, Mercy Corps, World Vision, Save the Children, IFRC, Danish Refugee Council, Norwegian People's Aid, CARE, and USAID.
+
+4. Think like a hiring manager rather than simply matching keywords.
+
+5. Optimize for ATS but avoid keyword stuffing.
+
+6. Rewrite the Professional Summary specifically for the advertised role.
+
+7. Rewrite every bullet under every position so that it reflects the priorities of the job description.
+
+8. Replace weak verbs with stronger leadership verbs.
+
+9. Add missing competencies only if they are reasonably supported by the candidate's experience.
+
+10. Produce a professional executive CV suitable for Director-level international NGO positions.
+
+Return ONLY valid JSON.
 """
 
 def build_user_prompt(cv_text, job_description):
     return f"""
-CV: {cv_text}
-JD: {job_description[:1500]}
+MASTER CV:
+{cv_text}
 
-Return JSON:
-{{"summary":"4-6 sentences","experience":{{"Chief of Staff (Feb 2023-To Date)":["bullet1","bullet2","bullet3","bullet4","bullet5","bullet6"],"Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)":["bullet1","bullet2","bullet3","bullet4","bullet5"],"Chief Operations Officer (Jul 2016 – Jul 2021)":["bullet1","bullet2","bullet3","bullet4","bullet5","bullet6"]}}}}
+JOB DESCRIPTION:
+{job_description}
+
+Carefully analyze both documents.
+
+Before rewriting the CV:
+1. Identify the 15-25 most important ATS keywords.
+2. Identify the top 10 competencies the employer is seeking.
+3. Identify the leadership level expected.
+4. Identify the likely hiring manager's priorities.
+5. Identify the biggest gaps between my CV and the role.
+
+Then tailor my CV specifically for this position.
+
+Your tasks are:
+1. Rewrite the Professional Summary (4-6 sentences).
+2. Rewrite every job description under every employer (6-7 bullet points per job).
+3. Highlight experience most relevant to this role.
+4. Naturally incorporate ATS keywords.
+5. Emphasize transferable skills where direct experience is limited.
+6. Remove emphasis on experiences that are less relevant.
+7. Maintain complete factual accuracy.
+8. Use concise executive-level language.
+9. Produce a CV that would realistically compete for an interview for this specific role.
+
+Return JSON in this format:
+{{
+    "summary": "Professional Summary here",
+    "experience": {{
+        "Chief of Staff (Feb 2023-To Date)": [
+            "bullet 1",
+            "bullet 2",
+            "bullet 3",
+            "bullet 4",
+            "bullet 5",
+            "bullet 6",
+            "bullet 7"
+        ],
+        "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
+            "bullet 1",
+            "bullet 2",
+            "bullet 3",
+            "bullet 4",
+            "bullet 5",
+            "bullet 6"
+        ],
+        "Chief Operations Officer (Jul 2016 – Jul 2021)": [
+            "bullet 1",
+            "bullet 2",
+            "bullet 3",
+            "bullet 4",
+            "bullet 5",
+            "bullet 6"
+        ]
+    }}
+}}
+"""
+
+def build_cover_letter_prompt(cv_text, job_description):
+    return f"""
+MASTER CV:
+{cv_text}
+
+JOB DESCRIPTION:
+{job_description}
+
+Write a one-page cover letter specifically tailored to this position.
+
+The cover letter should:
+• Explain why the candidate is an excellent fit.
+• Connect previous experience to the advertised role.
+• Demonstrate knowledge of the organization's mission.
+• Highlight transferable experience.
+• Sound natural and authentic.
+• Avoid generic AI phrases.
+• Be persuasive enough that a hiring manager would be interested in interviewing the candidate.
+
+Do not invent qualifications or achievements.
+Return ONLY the cover letter text.
 """
 
 def call_ai(cv_text, job_description):
-    """Call DeepSeek API - Optimized for speed"""
+    """Call DeepSeek API with professional prompts"""
     try:
         print("📤 Sending request to DeepSeek API...")
         response = client.chat.completions.create(
             model="deepseek-v4-flash",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": build_user_prompt(cv_text, job_description[:1500])},
+                {"role": "user", "content": build_user_prompt(cv_text, job_description)},
             ],
             temperature=0.2,
             response_format={"type": "json_object"},
-            timeout=30.0
+            timeout=45.0
         )
         
         raw_response = response.choices[0].message.content
@@ -156,22 +234,18 @@ def call_ai(cv_text, job_description):
             'experience': {}
         }
 
-def tailor_cover_letter(cover_text, cv_text, job_description):
-    """Generate cover letter - FAST"""
-    prompt = f"""
-JD: {job_description[:1000]}
-Template: {cover_text[:500]}
-Write 3 short paragraphs for cover letter.
-"""
+def tailor_cover_letter(cv_text, job_description):
+    """Generate tailored cover letter"""
     try:
+        print("✍️ Generating cover letter...")
         response = client.chat.completions.create(
             model="deepseek-v4-flash",
             messages=[
-                {"role": "system", "content": "Write a concise 3-paragraph cover letter."},
-                {"role": "user", "content": prompt}
+                {"role": "system", "content": "You are an expert cover letter writer for international organizations."},
+                {"role": "user", "content": build_cover_letter_prompt(cv_text, job_description)}
             ],
             temperature=0.3,
-            timeout=20.0
+            timeout=30.0
         )
         return response.choices[0].message.content
     except Exception as e:
@@ -277,15 +351,41 @@ def create_tailored_docx(new_summary, new_experience):
         company_para.runs[0].font.size = Pt(12)
         company_para.runs[0].italic = True
         
-        # Bullets - Use AI if available, otherwise fallback
+        # Bullets
         if job_title in new_experience and new_experience[job_title]:
             for bullet in new_experience[job_title]:
                 bullet_para = doc.add_paragraph(f"• {bullet}")
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
         else:
-            # Use fallback bullets (6-7 per job)
-            for bullet in FALLBACK_BULLETS.get(job_title, []):
+            # Fallback bullets
+            fallback_bullets = {
+                "Chief of Staff (Feb 2023-To Date)": [
+                    "Led strategic coordination across 15 government ministries, driving alignment with state development priorities.",
+                    "Managed stakeholder relationships with international donors and NGOs, ensuring collaborative program delivery.",
+                    "Developed and implemented strategic plans, translating high-level goals into actionable programs.",
+                    "Oversaw program monitoring and reporting, ensuring compliance with government and donor requirements.",
+                    "Provided crisis management and emergency response coordination under pressure.",
+                    "Facilitated resource mobilization and partnership building, strengthening institutional capacity."
+                ],
+                "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
+                    "Led humanitarian needs assessments using mixed-method research, informing strategic planning and funding proposals.",
+                    "Managed donor-funded programs, ensuring financial accountability and compliance with grant agreements.",
+                    "Conducted political, economic, and social analysis, providing data-driven insights for policy decisions.",
+                    "Established partnerships with UN agencies and NGOs, strengthening civil society and peacebuilding initiatives.",
+                    "Strengthened institutional capacity through training and technical support to ministry staff.",
+                    "Developed monitoring frameworks and reporting systems, improving program effectiveness."
+                ],
+                "Chief Operations Officer (Jul 2016 – Jul 2021)": [
+                    "Directed operational functions including budgeting, strategic planning, and resource allocation.",
+                    "Led business development initiatives, expanding operations and securing funding for vulnerable populations.",
+                    "Established strategic partnerships with international organizations, enhancing program sustainability.",
+                    "Managed community engagement and stakeholder relations, contributing to social development.",
+                    "Oversaw compliance, financial management, and reporting, ensuring accountability.",
+                    "Built and led high-performing teams, fostering a culture of continuous improvement."
+                ]
+            }
+            for bullet in fallback_bullets.get(job_title, []):
                 bullet_para = doc.add_paragraph(f"• {bullet}")
                 bullet_para.runs[0].font.name = 'Calibri'
                 bullet_para.runs[0].font.size = Pt(12)
@@ -347,15 +447,10 @@ def process_application(job_description):
     
     cv_text = MASTER_CV_TEMPLATE
     
-    if os.path.exists(COVER_PATH):
-        cover_text = read_docx(COVER_PATH)
-    else:
-        cover_text = "Dear Hiring Manager,\n\n[Your cover letter will go here]\n\nSincerely,\n[Your Name]"
-    
     print(f"📄 CV text length: {len(cv_text)}")
     
     try:
-        print("🤖 Tailoring CV...")
+        print("🤖 Tailoring CV with professional prompt...")
         result = call_ai(cv_text, job_description)
         
         tailored_summary = result.get('summary', '')
@@ -370,7 +465,7 @@ def process_application(job_description):
     
     try:
         print("✍️ Generating cover letter...")
-        tailored_cover = tailor_cover_letter(cover_text, cv_text, job_description)
+        tailored_cover = tailor_cover_letter(cv_text, job_description)
         print(f"✅ Cover letter: {len(tailored_cover)} chars")
     except Exception as e:
         tailored_cover = "Dear Hiring Manager,\n\nI am writing to express my interest in this position. With over 10 years of experience in government and international development, I am confident in my ability to contribute to your organization.\n\nSincerely,\n[Your Name]"
