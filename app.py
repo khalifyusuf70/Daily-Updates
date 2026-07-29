@@ -15,15 +15,18 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # ---------------------------
-# DEEPSEEK API CONFIGURATION
+# DEEPSEEK API CONFIGURATION - FIXED
 # ---------------------------
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
     print("⚠️ DEEPSEEK_API_KEY not set")
 
+# Initialize OpenAI client with proper parameters
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com"
+    base_url="https://api.deepseek.com",
+    timeout=60.0,
+    max_retries=2
 )
 
 COVER_PATH = "Cover_Template.docx"
@@ -75,7 +78,7 @@ COMPANY_NAMES = {
 }
 
 # ================================================================
-# IMPROVED PROMPTS - THIS IS THE KEY DIFFERENCE!
+# IMPROVED PROMPTS - KEY DIFFERENCE
 # ================================================================
 
 SYSTEM_PROMPT = """
