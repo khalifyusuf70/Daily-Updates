@@ -15,18 +15,15 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # ---------------------------
-# DEEPSEEK API CONFIGURATION - FIXED
+# DEEPSEEK API CONFIGURATION
 # ---------------------------
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 if not DEEPSEEK_API_KEY:
     print("⚠️ DEEPSEEK_API_KEY not set")
 
-# Initialize OpenAI client with proper parameters
 client = OpenAI(
     api_key=DEEPSEEK_API_KEY,
-    base_url="https://api.deepseek.com",
-    timeout=60.0,
-    max_retries=2
+    base_url="https://api.deepseek.com/v1"
 )
 
 COVER_PATH = "Cover_Template.docx"
@@ -77,76 +74,87 @@ COMPANY_NAMES = {
     "Chief Operations Officer (Jul 2016 – Jul 2021)": "KIMS MICROFINANCE, Somalia"
 }
 
-# ================================================================
-# IMPROVED PROMPTS - KEY DIFFERENCE
-# ================================================================
-
+# ---------------------------
+# IMPROVED PROMPTS WITH EXPLICIT MAPPING
+# ---------------------------
 SYSTEM_PROMPT = """
-You are one of the world's leading Executive Resume Writers, Executive Recruiters,
-ATS Optimization Specialists, and Career Strategists.
+You are an expert Executive Resume Writer for international humanitarian organizations (UN, IRC, NRC, Mercy Corps, Save the Children, etc.).
 
-Your task is to tailor a candidate's CV and cover letter to maximize alignment
-with a target job description while maintaining complete honesty and factual accuracy.
+Your task is to rewrite CV bullet points so that EVERY bullet explicitly connects the candidate's experience to the job requirements.
 
-Rules:
-- Never fabricate employers, education, achievements or qualifications.
-- Rewrite only using truthful information.
-- Optimize for ATS (Applicant Tracking Systems).
-- Rewrite the Professional Summary.
-- Rewrite Core Competencies.
-- Rewrite Experience sections with relevant keywords.
-- Write a tailored Cover Letter.
+CRITICAL RULES:
+1. NEVER invent experience, achievements, or qualifications.
+2. For EACH bullet, EXPLICITLY show how the experience maps to a specific job requirement.
+3. Use phrases like: "directly aligned with", "parallel to", "mirrors", "equivalent to", "relevant to", "similar to", "matching".
+4. Use EXACT keywords from the job description.
+5. Show the hiring manager exactly WHY this experience matters for the role.
+6. Keep 6-7 bullet points per job.
+7. Think: "What does the employer need? How does my experience directly address that?"
+
+Example mapping patterns:
+- If JD says "Design and deliver training" → "Designed and delivered training on [X], directly aligning with the need to train researchers on SOPs"
+- If JD says "SOP compliance monitoring" → "Monitored compliance with [Y], similar to the SOP compliance monitoring required for this role"
+- If JD says "IRB submissions" → "Managed [Z] submission processes, parallel to managing IRB submissions"
+- If JD says "Maintain audit-ready records" → "Maintained comprehensive records for [X], mirroring the audit-ready documentation required for IRB protocols"
+- If JD says "Coordinate review meetings" → "Coordinated [Y] meetings with multiple stakeholders, equivalent to coordinating IRB review meetings"
+
+Return ONLY valid JSON.
 """
 
 def build_user_prompt(cv_text, job_description):
     return f"""
-MASTER CV
+MASTER CV (candidate's actual experience):
 {cv_text}
 
-JOB DESCRIPTION
+JOB DESCRIPTION (what the employer needs):
 {job_description}
 
-Carefully analyze both documents.
+TASK:
+Rewrite the CV so that EVERY bullet point EXPLICITLY connects the candidate's experience to a specific job requirement.
 
-Rewrite the CV specifically for this position.
+RULES:
+1. Keep 6-7 bullet points per job.
+2. Use mapping phrases: "directly aligned with", "parallel to", "mirrors", "equivalent to", "relevant to", "similar to".
+3. Use keywords from the job description.
+4. Show WHY each experience matters for this role.
+5. Never invent experience.
 
-Return JSON with:
-1. Updated Professional Summary
-2. Updated Core Competencies
-3. Updated Experience (for each job, with 6-7 bullet points)
-4. Updated Technical Skills
+EXAMPLE of what a bullet should look like:
+"Led needs assessments using quantitative and qualitative research methodologies, directly aligned with designing and delivering training for researchers on data collection SOPs."
 
-Return ONLY valid JSON with this format:
+Another example:
+"Coordinated cross-ministerial monitoring and reporting, similar to the SOP compliance monitoring and quarterly reporting required for this role."
+
+Return JSON:
 {{
-    "summary": "4-6 sentence professional summary",
-    "core_competencies": ["competency 1", "competency 2", "competency 3", "competency 4", "competency 5"],
+    "summary": "4-6 sentence summary that explicitly connects the candidate to the role",
     "experience": {{
         "Chief of Staff (Feb 2023-To Date)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6"
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement",
+            "bullet with explicit mapping to job requirement"
         ],
         "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6"
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping"
         ],
         "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-            "bullet 1",
-            "bullet 2",
-            "bullet 3",
-            "bullet 4",
-            "bullet 5",
-            "bullet 6"
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping",
+            "bullet with explicit mapping"
         ]
-    }},
-    "technical_skills": ["skill 1", "skill 2", "skill 3", "skill 4", "skill 5"]
+    }}
 }}
 """
 
@@ -158,21 +166,23 @@ MASTER CV:
 JOB DESCRIPTION:
 {job_description}
 
-Write a compelling 3-paragraph cover letter that:
-1. Opens with enthusiasm and clearly states why the candidate is a great fit
-2. Connects the candidate's experience to the job requirements
-3. Demonstrates understanding of the organization's mission
-4. Is persuasive, authentic, and avoids generic phrases
+Write a 3-paragraph cover letter that:
+1. Opens with enthusiasm and explicitly states why the candidate is a great fit.
+2. In each bullet under experience, EXPLICITLY connects the candidate's experience to the job requirements.
+3. Uses phrases like "directly aligned with", "parallel to", "mirrors", "equivalent to".
+4. Demonstrates understanding of the organization's mission.
+5. Is persuasive and authentic.
+6. Avoids generic phrases.
 
 Return ONLY the cover letter text.
 """
 
 def call_ai(cv_text, job_description):
-    """Call DeepSeek API with improved prompts"""
+    """Call DeepSeek API with professional prompts"""
     try:
         print("📤 Sending request to DeepSeek API...")
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": build_user_prompt(cv_text, job_description)},
@@ -191,10 +201,6 @@ def call_ai(cv_text, job_description):
             result['summary'] = "Summary not provided"
         if 'experience' not in result:
             result['experience'] = {}
-        if 'technical_skills' not in result:
-            result['technical_skills'] = []
-        if 'core_competencies' not in result:
-            result['core_competencies'] = []
         
         return result
         
@@ -202,19 +208,17 @@ def call_ai(cv_text, job_description):
         print(f"API error: {str(e)}")
         return {
             'summary': 'Error. Please try again.',
-            'experience': {},
-            'technical_skills': [],
-            'core_competencies': []
+            'experience': {}
         }
 
 def tailor_cover_letter(cv_text, job_description):
-    """Generate tailored cover letter"""
+    """Generate tailored cover letter with explicit mapping"""
     try:
         print("✍️ Generating cover letter...")
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-v4-flash",
             messages=[
-                {"role": "system", "content": "You are an expert cover letter writer. Every sentence should connect the candidate's experience to the job requirements."},
+                {"role": "system", "content": "You are an expert cover letter writer for international organizations. Every sentence should connect the candidate's experience to the job requirements."},
                 {"role": "user", "content": build_cover_letter_prompt(cv_text, job_description)}
             ],
             temperature=0.3,
@@ -238,8 +242,8 @@ def read_docx(file_path):
         print(f"Error reading {file_path}: {str(e)}")
         return ""
 
-def create_tailored_docx(new_summary, new_experience, core_competencies, technical_skills):
-    """Create tailored CV"""
+def create_tailored_docx(new_summary, new_experience):
+    """Create tailored CV with skills section and 6-7 bullets per job"""
     doc = Document()
     
     style = doc.styles['Normal']
@@ -264,17 +268,45 @@ def create_tailored_docx(new_summary, new_experience, core_competencies, technic
         summary_para.runs[0].font.size = Pt(12)
     doc.add_paragraph("")
     
-    # ========== CORE COMPETENCIES ==========
-    comp_header = doc.add_paragraph("# Core Competencies")
-    comp_header.runs[0].font.name = 'Calibri'
-    comp_header.runs[0].font.size = Pt(12)
-    comp_header.runs[0].bold = True
+    # ========== SKILLS HIGHLIGHTS ==========
+    skills_header = doc.add_paragraph("# Skill Highlights")
+    skills_header.runs[0].font.name = 'Calibri'
+    skills_header.runs[0].font.size = Pt(12)
+    skills_header.runs[0].bold = True
     
-    if core_competencies:
-        for comp in core_competencies:
-            comp_para = doc.add_paragraph(f"• {comp}")
-            comp_para.runs[0].font.name = 'Calibri'
-            comp_para.runs[0].font.size = Pt(12)
+    skills_left = [
+        "• Resource Mobilization & Grants Management",
+        "• Foundation Pipeline Management",
+        "• Due Diligence & Risk Assessment",
+        "• Impact Reporting & Communication",
+        "• Political & Contextual Analysis"
+    ]
+    skills_right = [
+        "• Team Leadership & Organizational Development",
+        "• Risk Management & Compliance",
+        "• Humanitarian Response Programming",
+        "• Strategic Planning & Organizational Dev."
+    ]
+    
+    table = doc.add_table(rows=5, cols=2)
+    table.style = 'Table Grid'
+    table.autofit = False
+    table.columns[0].width = Inches(3.5)
+    table.columns[1].width = Inches(3.5)
+    
+    for row_idx in range(5):
+        left_cell = table.cell(row_idx, 0)
+        left_cell.text = skills_left[row_idx] if row_idx < len(skills_left) else ""
+        for run in left_cell.paragraphs[0].runs:
+            run.font.name = 'Calibri'
+            run.font.size = Pt(12)
+        
+        right_cell = table.cell(row_idx, 1)
+        right_cell.text = skills_right[row_idx] if row_idx < len(skills_right) else ""
+        for run in right_cell.paragraphs[0].runs:
+            run.font.name = 'Calibri'
+            run.font.size = Pt(12)
+    
     doc.add_paragraph("")
     
     # ========== EXPERIENCE ==========
@@ -284,13 +316,13 @@ def create_tailored_docx(new_summary, new_experience, core_competencies, technic
     exp_header.runs[0].bold = True
     
     for job_title in JOB_TITLES:
-        # Job Title
+        # Job Title - Segoe UI 12 Bold
         job_para = doc.add_paragraph(job_title)
         job_para.runs[0].font.name = 'Segoe UI'
         job_para.runs[0].font.size = Pt(12)
         job_para.runs[0].bold = True
         
-        # Company
+        # Company - Segoe UI 12 Italic
         company_para = doc.add_paragraph(COMPANY_NAMES.get(job_title, ""))
         company_para.runs[0].font.name = 'Segoe UI'
         company_para.runs[0].font.size = Pt(12)
@@ -306,28 +338,28 @@ def create_tailored_docx(new_summary, new_experience, core_competencies, technic
             # Fallback bullets
             fallback_bullets = {
                 "Chief of Staff (Feb 2023-To Date)": [
-                    "Led strategic coordination across 15 government ministries.",
-                    "Managed stakeholder relationships with international donors and NGOs.",
-                    "Developed and implemented strategic plans.",
-                    "Oversaw program monitoring and reporting.",
-                    "Provided crisis management and emergency response coordination.",
-                    "Facilitated resource mobilization and partnership building."
+                    "Led strategic coordination across 15 government ministries, directly aligned with coordinating research teams and cross-pillar collaboration.",
+                    "Managed stakeholder relationships with international donors and NGOs, parallel to managing relationships with IRB and research leads.",
+                    "Developed and implemented strategic plans, mirroring the development of SOPs and guidance materials.",
+                    "Oversaw program monitoring and reporting, equivalent to supporting quarterly compliance monitoring.",
+                    "Provided crisis management and emergency response coordination, similar to managing regulatory compliance and risk.",
+                    "Facilitated resource mobilization and partnership building, relevant to organizing Research Community of Practice."
                 ],
                 "Senior Advisor – Projects Planning & Grants Development (Aug 2021 – Jan 2023)": [
-                    "Led humanitarian needs assessments using research methodologies.",
-                    "Managed donor-funded programs with strict compliance.",
-                    "Conducted analysis and reporting for policy decisions.",
-                    "Established partnerships with UN agencies and NGOs.",
-                    "Strengthened institutional capacity through training.",
-                    "Developed monitoring frameworks and reporting systems."
+                    "Led humanitarian needs assessments using research methodologies, directly aligned with designing training for researchers on data collection SOPs.",
+                    "Managed donor-funded programs with strict compliance, parallel to maintaining research forms and templates for SOP compliance.",
+                    "Conducted analysis and reporting for policy decisions, mirroring the analytical reporting required for IRB and research governance.",
+                    "Established partnerships with UN agencies and NGOs, similar to organizing and coordinating Research Pillar-wide meetings.",
+                    "Strengthened institutional capacity through training, directly matching the need to deliver training for researchers on SOPs.",
+                    "Developed monitoring frameworks and reporting systems, equivalent to supporting quarterly compliance monitoring across the research portfolio."
                 ],
                 "Chief Operations Officer (Jul 2016 – Jul 2021)": [
-                    "Directed operational functions including budgeting and planning.",
-                    "Led business development and market expansion.",
-                    "Established strategic partnerships.",
-                    "Managed stakeholder relations.",
-                    "Oversaw compliance and reporting.",
-                    "Built and led teams."
+                    "Directed operational functions including budgeting and planning, relevant to operating and maintaining AI-enabled research tools.",
+                    "Led business development and market expansion, similar to piloting AI tools with research teams and developing guidance.",
+                    "Established strategic partnerships, akin to coordinating cross-team knowledge exchange and the Research Community of Practice.",
+                    "Managed stakeholder relations, relevant to organizing Research Pillar-wide meetings and managing IRB relationships.",
+                    "Oversaw compliance and reporting, directly supporting SOP compliance monitoring.",
+                    "Built and led teams, comparable to facilitating communities of practice and coordinating Data Champions."
                 ]
             }
             for bullet in fallback_bullets.get(job_title, []):
@@ -336,19 +368,6 @@ def create_tailored_docx(new_summary, new_experience, core_competencies, technic
                 bullet_para.runs[0].font.size = Pt(12)
         
         doc.add_paragraph("")
-    
-    # ========== TECHNICAL SKILLS ==========
-    tech_header = doc.add_paragraph("# Technical Skills")
-    tech_header.runs[0].font.name = 'Calibri'
-    tech_header.runs[0].font.size = Pt(12)
-    tech_header.runs[0].bold = True
-    
-    if technical_skills:
-        for skill in technical_skills:
-            skill_para = doc.add_paragraph(f"• {skill}")
-            skill_para.runs[0].font.name = 'Calibri'
-            skill_para.runs[0].font.size = Pt(12)
-    doc.add_paragraph("")
     
     # ========== EDUCATION ==========
     edu_header = doc.add_paragraph("# Education")
@@ -408,20 +427,18 @@ def process_application(job_description):
     print(f"📄 CV text length: {len(cv_text)}")
     
     try:
-        print("🤖 Tailoring CV...")
+        print("🤖 Tailoring CV with explicit mapping...")
         result = call_ai(cv_text, job_description)
         
         tailored_summary = result.get('summary', '')
         tailored_experience = result.get('experience', {})
-        core_competencies = result.get('core_competencies', [])
-        technical_skills = result.get('technical_skills', [])
         
         print(f"📝 Summary: {tailored_summary[:100] if tailored_summary else 'EMPTY'}...")
         print(f"📝 Experience keys: {list(tailored_experience.keys())}")
         
     except Exception as e:
         print(f"❌ AI error: {str(e)}")
-        return None, None, f"AI error: {str(e)}", "Error", {}, [], []
+        return None, None, f"AI error: {str(e)}", "Error", {}, "Error"
     
     try:
         print("✍️ Generating cover letter...")
@@ -433,7 +450,7 @@ def process_application(job_description):
     
     try:
         print("📄 Creating DOCX...")
-        cv_output = create_tailored_docx(tailored_summary, tailored_experience, core_competencies, technical_skills)
+        cv_output = create_tailored_docx(tailored_summary, tailored_experience)
         
         cover_doc = Document()
         for line in tailored_cover.split('\n'):
